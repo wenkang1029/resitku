@@ -111,11 +111,13 @@ bot.on('message:photo', async (ctx) => {
 
     const escapeMd = (str: string) => str.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1')
 
+    const receipt = data.db_receipt
+    const llm = data.raw_llm_response || {}
     const merchant = escapeMd(llm.merchant || 'Unknown')
     const total = Number(llm.total_amount || 0).toFixed(2)
     const date = escapeMd(llm.transaction_date || 'N/A')
     const spendCat = escapeMd(llm.spending_category || 'other')
-    const reliefCat = llm.relief_category === 'none' ? 'None (Not claimable)' : escapeMd(llm.relief_category)
+    const reliefCat = llm.relief_category === 'none' ? 'None (Not claimable)' : escapeMd(llm.relief_category || 'none')
 
     // 2. NEEDS REVIEW PATH
     if (data.needs_review) {
