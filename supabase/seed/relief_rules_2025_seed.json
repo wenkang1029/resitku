@@ -1,0 +1,262 @@
+{
+  "assessment_year": 2025,
+  "rule_version": 1,
+  "status": "draft",
+  "source_document": "LHDN official website table — Tahun Taksiran 2025 (Jenis Potongan Individu), cross-verified against Navigasi HASiL 2026 leaflet (updated 28/04/2026) and independent tax guide sources",
+  "data_quality_flags": [
+    {
+      "items": ["medical_combined_umbrella", "medical_serious_vaccination_dental", "medical_fullexam_covid_mental_selftest", "child_learning_disability_assessment"],
+      "issue": "RESOLVED per user-confirmed LHDN e-Filing (MyTax/ezHasil) behavior: items 6, 7, and 8 are NOT independent categories. They share a single combined umbrella cap of RM10,000 (heading: 'Perbelanjaan perubatan bagi diri sendiri, suami/isteri atau anak'). Within that umbrella, item 7 is individually capped at RM1,000 and item 8 at RM6,000 by the e-Filing form itself; item 6 has no additional individual cap beyond its own internal vaccination/dental sub-caps. If the sum of all three exceeds RM10,000, the system restricts total claimable relief to RM10,000. Schema restructured below to reflect this: a new medical_combined_umbrella parent (RM10,000) with items 6, 7, and 8 all as its children, each still carrying their own individual limit_amount as an additional constraint layered under the shared umbrella."
+    }
+  ],
+  "engine_note": "For categories with a shared umbrella cap (sub_cap_parent_id pointing to a parent that itself has multiple direct children, e.g. medical_combined_umbrella), the relief calculation engine must apply BOTH constraints: (1) each child's own limit_amount individually, AND (2) the sum of all children's claimed amounts capped at the parent's limit_amount. This differs from a simple single sub-cap (e.g. medical_vaccination_subcap under medical_serious_vaccination_dental), which only needs its own limit checked since it's the only sub-cap consuming that parent's headroom in this dataset. FR-4.2 (parent-child limit logic) should be built to handle the general case: sum of children vs parent ceiling, not just single-child sub-caps.",
+  "categories": [
+    {
+      "category_key": "self_dependent",
+      "category_label": "Individu dan saudara tanggungan / Individual and dependent relatives",
+      "limit_amount": 9000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 1"
+    },
+    {
+      "category_key": "parents_medical_care",
+      "category_label": "Perbelanjaan ibu bapa dan datuk nenek (rawatan perubatan, pergigian, keperluan khas, penjagaan) / Parents & grandparents medical/dental/special needs/carer expenses",
+      "limit_amount": 8000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 2 (parent bracket)"
+    },
+    {
+      "category_key": "parents_full_medical_exam",
+      "category_label": "Pemeriksaan perubatan penuh ibu bapa / Parents' complete medical examination",
+      "limit_amount": 1000,
+      "sub_cap_parent_id": "parents_medical_care",
+      "source_reference": "LHDN item 2, sub-item 2 (restricted RM1,000 within the RM8,000 parent bracket)"
+    },
+    {
+      "category_key": "disabled_support_equipment",
+      "category_label": "Peralatan sokongan asas (diri sendiri/suami/isteri/anak/ibu bapa kurang upaya) / Basic supporting equipment for disabled self/spouse/child/parent",
+      "limit_amount": 6000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 3"
+    },
+    {
+      "category_key": "disabled_individual",
+      "category_label": "Individu kurang upaya / Disabled individual",
+      "limit_amount": 7000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 4"
+    },
+    {
+      "category_key": "education_fees_self",
+      "category_label": "Yuran pengajian (sendiri) / Education fees (self)",
+      "limit_amount": 7000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 5 (parent bracket)"
+    },
+    {
+      "category_key": "education_upskilling_course",
+      "category_label": "Kursus peningkatan kemahiran atau kemajuan diri / Upskilling or self-enhancement course",
+      "limit_amount": 2000,
+      "sub_cap_parent_id": "education_fees_self",
+      "source_reference": "LHDN item 5, sub-item 3 (restricted RM2,000 within the RM7,000 parent bracket)"
+    },
+    {
+      "category_key": "medical_combined_umbrella",
+      "category_label": "Perbelanjaan perubatan bagi diri sendiri, suami/isteri atau anak (had gabungan) / Medical expenses for self, spouse or child (combined umbrella cap)",
+      "limit_amount": 10000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN e-Filing (MyTax/ezHasil) combined heading covering items 6, 7, and 8 — confirmed by user against official portal behavior, not merely the printed leaflet table"
+    },
+    {
+      "category_key": "medical_serious_vaccination_dental",
+      "category_label": "Perbelanjaan perubatan: penyakit serius, rawatan kesuburan, pemvaksinan, pergigian / Medical: serious diseases, fertility treatment, vaccination, dental",
+      "limit_amount": 10000,
+      "sub_cap_parent_id": "medical_combined_umbrella",
+      "source_reference": "LHDN item 6, child of the combined RM10,000 umbrella. No additional individual cap of its own beyond the vaccination/dental sub-caps below."
+    },
+    {
+      "category_key": "medical_vaccination_subcap",
+      "category_label": "Pemvaksinan (sub-cap) / Vaccination (sub-cap)",
+      "limit_amount": 1000,
+      "sub_cap_parent_id": "medical_serious_vaccination_dental",
+      "source_reference": "LHDN item 6, sub-item 3 (restricted RM1,000 within item 6, which itself sits inside the RM10,000 combined umbrella)"
+    },
+    {
+      "category_key": "medical_dental_subcap",
+      "category_label": "Pemeriksaan dan rawatan pergigian (sub-cap) / Dental examination and treatment (sub-cap)",
+      "limit_amount": 1000,
+      "sub_cap_parent_id": "medical_serious_vaccination_dental",
+      "source_reference": "LHDN item 6, sub-item 4 (restricted RM1,000 within item 6, which itself sits inside the RM10,000 combined umbrella)"
+    },
+    {
+      "category_key": "medical_fullexam_covid_mental_selftest",
+      "category_label": "Pemeriksaan perubatan penuh, ujian COVID-19, kesihatan mental, peralatan kendiri / Full medical exam, COVID-19 test, mental health, self-test devices",
+      "limit_amount": 1000,
+      "sub_cap_parent_id": "medical_combined_umbrella",
+      "source_reference": "LHDN item 7, child of the combined RM10,000 umbrella, individually capped at RM1,000 by the e-Filing form itself"
+    },
+    {
+      "category_key": "child_learning_disability_assessment",
+      "category_label": "Penilaian dan rawatan kurang upaya pembelajaran anak (≤18 tahun) / Learning disability assessment & treatment for child (≤18 years)",
+      "limit_amount": 6000,
+      "sub_cap_parent_id": "medical_combined_umbrella",
+      "source_reference": "LHDN item 8, child of the combined RM10,000 umbrella, individually capped at RM6,000 by the e-Filing form itself"
+    },
+    {
+      "category_key": "lifestyle_general",
+      "category_label": "Gaya hidup: buku, komputer/telefon/tablet, internet, kursus / Lifestyle: books, computer/phone/tablet, internet, courses",
+      "limit_amount": 2500,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 9"
+    },
+    {
+      "category_key": "lifestyle_sports",
+      "category_label": "Gaya hidup tambahan: peralatan sukan, fasiliti sukan, pertandingan, gimnasium / Additional lifestyle: sports equipment, facility fees, competitions, gym",
+      "limit_amount": 1000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 10"
+    },
+    {
+      "category_key": "breastfeeding_equipment",
+      "category_label": "Peralatan penyusuan ibu (anak ≤2 tahun, sekali setiap 2 YA) / Breastfeeding equipment (child ≤2 years, once per 2 YA)",
+      "limit_amount": 1000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 11"
+    },
+    {
+      "category_key": "childcare_fees",
+      "category_label": "Yuran penghantaran anak (≤6 tahun) ke taman asuhan/tadika berdaftar / Registered childcare/kindergarten fees (child ≤6 years)",
+      "limit_amount": 3000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 12"
+    },
+    {
+      "category_key": "sspn_net_deposit",
+      "category_label": "Tabungan bersih SSPN / Net SSPN savings deposit",
+      "limit_amount": 8000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 13"
+    },
+    {
+      "category_key": "spouse_alimony",
+      "category_label": "Suami/isteri/bayaran alimoni kepada bekas isteri / Spouse / alimony to former wife",
+      "limit_amount": 4000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 14"
+    },
+    {
+      "category_key": "disabled_spouse",
+      "category_label": "Suami/isteri kurang upaya / Disabled spouse",
+      "limit_amount": 6000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 15"
+    },
+    {
+      "category_key": "child_below_18",
+      "category_label": "Anak di bawah umur 18 tahun / Child below 18 years",
+      "limit_amount": 2000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 16a"
+    },
+    {
+      "category_key": "child_18plus_alevel_matriculation",
+      "category_label": "Anak 18+ belajar sepenuh masa (A-Level/sijil/matrikulasi/pra-ijazah) / Child 18+ full-time (A-Level/certificate/matriculation/pre-degree)",
+      "limit_amount": 2000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 16b (first tier)"
+    },
+    {
+      "category_key": "child_18plus_higher_ed",
+      "category_label": "Anak 18+ belajar sepenuh masa peringkat diploma/ijazah ke atas / Child 18+ full-time diploma/degree level and above",
+      "limit_amount": 8000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 16b (second tier — diploma+/degree+ in Malaysia or recognised institutions abroad)"
+    },
+    {
+      "category_key": "disabled_child",
+      "category_label": "Anak kurang upaya / Disabled child",
+      "limit_amount": 8000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 16c"
+    },
+    {
+      "category_key": "disabled_child_higher_ed_additional",
+      "category_label": "Tambahan anak kurang upaya belajar diploma/ijazah ke atas / Additional for disabled child studying diploma/degree level and above",
+      "limit_amount": 8000,
+      "sub_cap_parent_id": "disabled_child",
+      "source_reference": "LHDN item 16c (additional tier)"
+    },
+    {
+      "category_key": "life_insurance_epf",
+      "category_label": "Insurans nyawa dan KWSP / Life insurance and EPF",
+      "limit_amount": 7000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 17 (parent bracket)"
+    },
+    {
+      "category_key": "epf_contribution_subcap",
+      "category_label": "Caruman KWSP (sub-cap) / EPF contribution (sub-cap)",
+      "limit_amount": 4000,
+      "sub_cap_parent_id": "life_insurance_epf",
+      "source_reference": "LHDN item 17, sub-item 1 (restricted RM4,000 within the RM7,000 parent bracket)"
+    },
+    {
+      "category_key": "life_insurance_premium_subcap",
+      "category_label": "Premium insurans hayat/takaful (sub-cap) / Life insurance/takaful premium (sub-cap)",
+      "limit_amount": 3000,
+      "sub_cap_parent_id": "life_insurance_epf",
+      "source_reference": "LHDN item 17, sub-item 2 (restricted RM3,000 within the RM7,000 parent bracket)"
+    },
+    {
+      "category_key": "prs_deferred_annuity",
+      "category_label": "Skim Persaraan Swasta dan Anuiti Tertangguh / Private Retirement Scheme and deferred annuity",
+      "limit_amount": 3000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 18"
+    },
+    {
+      "category_key": "education_medical_insurance",
+      "category_label": "Insurans pendidikan dan perubatan / Education and medical insurance",
+      "limit_amount": 4000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 19"
+    },
+    {
+      "category_key": "socso_contribution",
+      "category_label": "Caruman PERKESO / SOCSO contribution",
+      "limit_amount": 350,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 20"
+    },
+    {
+      "category_key": "ev_charging_compost_machine",
+      "category_label": "Kemudahan pengecasan kenderaan elektrik dan mesin kompos sisa makanan / EV charging facility and food waste compost machine",
+      "limit_amount": 2500,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 21 (combined category, confirmed — resolves earlier ambiguity from PDF leaflet extraction)"
+    },
+    {
+      "category_key": "first_home_loan_interest_tier1",
+      "category_label": "Faedah pinjaman rumah pertama, harga ≤RM500,000 / First home loan interest, price ≤RM500,000",
+      "limit_amount": 7000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 22, tier i (SPA executed 1 Jan 2025 – 31 Dec 2027)"
+    },
+    {
+      "category_key": "first_home_loan_interest_tier2",
+      "category_label": "Faedah pinjaman rumah pertama, harga RM500,000–RM750,000 / First home loan interest, price RM500,000–RM750,000",
+      "limit_amount": 5000,
+      "sub_cap_parent_id": null,
+      "source_reference": "LHDN item 22, tier ii (SPA executed 1 Jan 2025 – 31 Dec 2027)"
+    }
+  ],
+  "excluded_not_reliefs": {
+    "note": "These are REBATES, not RELIEFS — different mechanism (deducted from tax payable, not chargeable income). Do not seed into relief_rules; receipts don't drive these.",
+    "items": [
+      "Self rebate RM400 (chargeable income ≤RM35,000)",
+      "Spouse rebate RM400 (same threshold + spouse no income)",
+      "Zakat/fitrah (limited to tax charged)",
+      "Umrah/pilgrimage levy (limited to 2 lifetime trips)"
+    ]
+  }
+}
