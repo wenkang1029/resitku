@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { GoogleGenAI } from '@google/genai'
+import { validateReceiptDate } from '@/lib/extraction/validateDate'
 
 interface LineItem {
   description: string
@@ -13,6 +14,8 @@ interface LineItem {
 interface ExtractionResponse {
   is_legible: boolean
   merchant: string | null
+  visible_date_raw: string | null
+  invoice_reference_raw: string | null
   transaction_date: string | null
   total_amount: number | null
   assessment_year: number
@@ -56,28 +59,30 @@ export async function POST(req: NextRequest) {
       userId = body.user_id || null
 
       if (!imageBase64) {
-        return NextResponse.json({ error: 'No image_base64 provided in JSON body' }, { status: 400 })
+        return NextResponse.json({ error: 'Missing image_base64 in JSON body' }, { status: 400 })
       }
     } else {
       return NextResponse.json({ error: 'Unsupported Content-Type. Use multipart/form-data or application/json' }, { status: 400 })
     }
 
-    const supabase = createServerClient()
+    const supabase = createAdminClient()
 
-    // If userId not provided, get the first existing user id
+    // If userId not provided in body, check active session from cookies
     if (!userId) {
-      const { data: usersList, error: uErr } = await supabase.from('users').select('id').limit(1)
-      if (uErr) console.error('Error fetching default user:', uErr)
-      if (usersList && usersList.length > 0) {
-        userId = usersList[0].id
-      } else {
-        userId = '8fd180b8-e569-4f19-ae6d-fca7305fd3a1'
+      const { createServerClient } = await import('@/lib/supabase/server')
+      const sessionClient = await createServerClient()
+      const { data: { user } } = await sessionClient.auth.getUser()
+      if (user) {
+        userId = user.id
       }
     }
 
-    // 2 & 3. Fetch relief rules for assessment_year (default 2025)
-    const targetYear = 2025
-    // Attempt active rules first, fallback to draft
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized: User not authenticated or user_id not provided' }, { status: 401 })
+    }
+
+    // 2 & 3. Fetch relief rules for assessment_year (default 2026/2025)
+    const targetYear = 2026
     let { data: rules } = await supabase
       .from('relief_rules')
       .select('id, category_key, category_label, limit_amount, description, rule_version, status')
@@ -87,7 +92,6 @@ export async function POST(req: NextRequest) {
     let rulesStatusUsed = 'active'
 
     if (!rules || rules.length === 0) {
-      console.warn(`[extract] WARNING: No ACTIVE relief rules found for assessment_year ${targetYear}. Falling back to DRAFT rules. (Phase 9 approval flow pending)`)
       const { data: draftRules } = await supabase
         .from('relief_rules')
         .select('id, category_key, category_label, limit_amount, description, rule_version, status')
@@ -105,11 +109,10 @@ export async function POST(req: NextRequest) {
     const ai = new GoogleGenAI({ apiKey })
 
     const prompt = `You are an expert Malaysian receipt data extraction system following the ResitKu schema specification.
-Analyze the provided image and extract structured receipt data.
+Analyze the provided image and extract raw structured text and details from the receipt.
 
 ### Legibility Check:
-First determine if the image is a legible receipt.
-- Set "is_legible": true if text, merchant name, amounts, and dates are reasonably discernible.
+- Set "is_legible": true if text, merchant name, amounts, and numbers are reasonably discernible.
 - Set "is_legible": false if the image is too blurry, dark, corrupt, blank, or completely unreadable.
 
 ### Tax Relief Rules Context for Assessment Year ${targetYear}:
@@ -117,11 +120,18 @@ The valid Malaysian tax relief category keys are:
 ${rulesContext}
 - "none": Use this if the expense does not qualify for any tax relief.
 
+### Extraction Instructions:
+- Report "visible_date_raw": the exact date text printed on the receipt verbatim, unparsed (e.g. "22/08/26", "22-AUG-2026", "22/08/2026", "2026-08-22").
+- Report "invoice_reference_raw": the invoice number, receipt ID, or transaction number as printed verbatim (e.g. "INV260822-091", "RCPT-1029", "POS-20260822-999") or null if none is printed.
+- Do NOT internally attempt to reconcile or alter the raw values. Report exactly what is visible on the image.
+
 ### Output JSON Schema:
 Return ONLY a valid JSON object matching this schema precisely without markdown code fences:
 {
   "is_legible": true or false,
   "merchant": "string (name of merchant/store) or null if unreadable",
+  "visible_date_raw": "string or null if unreadable",
+  "invoice_reference_raw": "string or null if unreadable",
   "transaction_date": "YYYY-MM-DD or null if unreadable",
   "total_amount": 0.00 (numeric total paid, or null if unreadable),
   "assessment_year": ${targetYear},
@@ -136,11 +146,11 @@ Return ONLY a valid JSON object matching this schema precisely without markdown 
       "is_claimable": true or false
     }
   ],
-  "extraction_notes": "string (optional — note any ambiguity, smudged text, or assumptions made)"
+  "extraction_notes": "string (optional — note any smudged text, unreadable fields, or assumptions)"
 }
 
 Guidelines:
-- If is_legible is false, you can set merchant, transaction_date, total_amount to null, line_items to [], and state why in extraction_notes.
+- If is_legible is false, you can set merchant, visible_date_raw, invoice_reference_raw, total_amount to null, line_items to [], and state why in extraction_notes.
 - If the receipt has mixed items (e.g. pharmacy with both medication and cosmetics), split them into separate line_items.
 - spending_category and relief_category are independent.
 - Do NOT output any confidence score field.`
@@ -185,7 +195,7 @@ Guidelines:
     // REJECTION PATH: Handle unreadable/blurry receipts
     // -------------------------------------------------------------
     const isExplicitlyIllegible = extracted.is_legible === false
-    const isAllCoreFieldsMissing = !extracted.merchant && !extracted.total_amount && !extracted.transaction_date
+    const isAllCoreFieldsMissing = !extracted.merchant && !extracted.total_amount && !extracted.visible_date_raw && !extracted.transaction_date
 
     if (isExplicitlyIllegible || isAllCoreFieldsMissing) {
       const rejectReason = extracted.extraction_notes || 'Image is blurry, unreadable, or missing core transaction details'
@@ -199,7 +209,9 @@ Guidelines:
       })
     }
 
-    // 5. Compute needs_review heuristic in code (per receipt-extraction-schema skill)
+    // -------------------------------------------------------------
+    // 5. Programmatic Validation & Heuristics
+    // -------------------------------------------------------------
     const validCategoryKeys = new Set(rules.map((r) => r.category_key).concat(['none']))
     let needsReview = false
     const reviewReasons: string[] = []
@@ -226,10 +238,17 @@ Guidelines:
       reviewReasons.push(`Relief category '${extracted.relief_category}' is not in active/draft relief rules`)
     }
 
-    // Check 4: transaction_date validity
-    if (!extracted.transaction_date || !/^\d{4}-\d{2}-\d{2}$/.test(extracted.transaction_date)) {
+    // Check 4: Deterministic Date Validation & Cross-Check (src/lib/extraction/validateDate.ts)
+    const dateValidation = validateReceiptDate(
+      extracted.visible_date_raw,
+      extracted.invoice_reference_raw,
+      extracted.transaction_date
+    )
+
+    const finalResolvedDate = dateValidation.resolved_date
+    if (dateValidation.needs_review && dateValidation.review_reason) {
       needsReview = true
-      reviewReasons.push('Transaction date is missing or not in YYYY-MM-DD format')
+      reviewReasons.push(dateValidation.review_reason)
     }
 
     // Check 5: Ambiguity flagged in notes
@@ -239,9 +258,15 @@ Guidelines:
     }
 
     // -------------------------------------------------------------
+    // Embed raw extraction signals in notes for full auditability
+    // -------------------------------------------------------------
+    const rawSignalsNotes = `[Raw Signals] Visible Date: "${extracted.visible_date_raw || 'N/A'}", Invoice Ref: "${extracted.invoice_reference_raw || 'N/A'}".`
+    const combinedNotes = extracted.extraction_notes
+      ? `${extracted.extraction_notes} | ${rawSignalsNotes}`
+      : rawSignalsNotes
+
+    // -------------------------------------------------------------
     // Determine rule_version_id
-    // If the receipt matched a specific relief rule (including the 'none' placeholder),
-    // link that rule's UUID.
     // -------------------------------------------------------------
     let ruleVersionId: string | null = null
     const matchedRule = rules.find((r) => r.category_key === extracted.relief_category)
@@ -253,63 +278,116 @@ Guidelines:
       ruleVersionId = fallbackRule ? fallbackRule.id : null
     }
 
-    console.log(`[extract] Assigning rule_version_id: ${ruleVersionId} (matched category_key: ${matchedRule?.category_key || 'fallback to none/first'})`)
+    // -------------------------------------------------------------
+    // Duplicate Detection Check (Soft Warning)
+    // -------------------------------------------------------------
+    let isPossibleDuplicate = false
+    let duplicateOfId: string | null = null
 
+    if (userId && extracted.total_amount && finalResolvedDate) {
+      const { data: existingMatches } = await supabase
+        .from('receipts')
+        .select('id, merchant, total_amount, transaction_date')
+        .eq('user_id', userId)
+        .eq('transaction_date', finalResolvedDate)
+        .eq('total_amount', Number(extracted.total_amount))
+
+      if (existingMatches && existingMatches.length > 0) {
+        const cleanMerchant = (extracted.merchant || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+        const match = existingMatches.find((m) => {
+          const mClean = (m.merchant || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+          return mClean === cleanMerchant || cleanMerchant.includes(mClean) || mClean.includes(cleanMerchant)
+        })
+
+        if (match) {
+          isPossibleDuplicate = true
+          duplicateOfId = match.id
+          needsReview = true
+          reviewReasons.push(`Possible duplicate of existing receipt (${match.merchant} on ${match.transaction_date})`)
+        }
+      }
+    }
+
+    // -------------------------------------------------------------
+    // Upload image to Supabase Storage bucket (receipts-images)
+    // -------------------------------------------------------------
+    let storedImagePath: string | null = null
+    if (imageBase64 && userId) {
+      try {
+        const fileExt = mimeType.includes('png') ? 'png' : 'jpg'
+        const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`
+        const buffer = Buffer.from(imageBase64, 'base64')
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('receipts-images')
+          .upload(fileName, buffer, {
+            contentType: mimeType,
+            upsert: true,
+          })
+
+        if (uploadError) {
+          console.error('[extract] Storage upload error:', JSON.stringify(uploadError))
+        } else if (uploadData) {
+          storedImagePath = uploadData.path
+          console.log('[extract] Successfully uploaded receipt image to:', storedImagePath)
+        }
+      } catch (storageErr) {
+        console.error('[extract] Error uploading image to storage:', storageErr)
+      }
+    }
+
+    // Determine status: if flagged with reviewReasons (including duplicate/date discrepancy), pending_review
     const status = needsReview ? 'pending_review' : 'confirmed'
 
-    // 6. Insert into Supabase receipts & receipt_line_items
+    // 6. Insert into Supabase receipts & receipt_line_items via insert_receipt_admin RPC
     let insertedReceipt = null
     if (userId) {
-      const insertPayload = {
-        user_id: userId,
-        merchant: extracted.merchant || 'Unknown Merchant',
-        total_amount: extracted.total_amount ? Number(extracted.total_amount) : null,
-        transaction_date: extracted.transaction_date || null,
-        assessment_year: extracted.assessment_year || targetYear,
-        spending_category: extracted.spending_category || 'other',
-        relief_category: extracted.relief_category || 'none',
-        needs_review: needsReview,
-        status: status,
-        rule_version_id: ruleVersionId,
-      }
+      const lineItemsPayload = (extracted.line_items || []).map((item) => ({
+        description: item.description,
+        amount: item.amount ? Number(item.amount) : 0,
+        spending_category: item.spending_category || extracted.spending_category || 'other',
+        relief_category: item.relief_category || 'none',
+        is_claimable: Boolean(item.is_claimable),
+      }))
+
+      // Compute assessment year from the resolved date if available
+      const resolvedAssessmentYear = finalResolvedDate
+        ? new Date(finalResolvedDate).getFullYear()
+        : targetYear
 
       const { data: receiptRow, error: receiptError } = await supabase
-        .from('receipts')
-        .insert(insertPayload)
-        .select()
-        .single()
+        .rpc('insert_receipt_admin', {
+          p_user_id: userId,
+          p_image_url: storedImagePath,
+          p_merchant: extracted.merchant || 'Unknown Merchant',
+          p_total_amount: extracted.total_amount ? Number(extracted.total_amount) : null,
+          p_transaction_date: finalResolvedDate,
+          p_assessment_year: resolvedAssessmentYear,
+          p_spending_category: extracted.spending_category || 'other',
+          p_relief_category: extracted.relief_category || 'none',
+          p_needs_review: needsReview,
+          p_status: status,
+          p_rule_version_id: ruleVersionId,
+          p_possible_duplicate: isPossibleDuplicate,
+          p_duplicate_of_id: duplicateOfId,
+          p_line_items: lineItemsPayload,
+        })
 
       if (receiptError) {
-        console.error('Error inserting receipt to Supabase:', receiptError)
+        console.error('Error inserting receipt to Supabase via RPC:', JSON.stringify(receiptError))
       } else {
         insertedReceipt = receiptRow
-
-        // Insert line items if present
-        if (extracted.line_items && extracted.line_items.length > 0 && receiptRow) {
-          const lineItemsToInsert = extracted.line_items.map((item) => ({
-            receipt_id: receiptRow.id,
-            description: item.description,
-            amount: item.amount ? Number(item.amount) : 0,
-            spending_category: item.spending_category || extracted.spending_category || 'other',
-            relief_category: item.relief_category || 'none',
-            is_claimable: Boolean(item.is_claimable),
-          }))
-
-          const { error: lineItemsError } = await supabase
-            .from('receipt_line_items')
-            .insert(lineItemsToInsert)
-
-          if (lineItemsError) {
-            console.error('Error inserting receipt_line_items:', lineItemsError)
-          }
-        }
       }
     }
 
     // 7. Return response
     return NextResponse.json({
       success: true,
-      raw_llm_response: extracted,
+      raw_llm_response: {
+        ...extracted,
+        transaction_date: finalResolvedDate,
+        extraction_notes: combinedNotes,
+      },
       needs_review: needsReview,
       review_reasons: reviewReasons,
       status: status,
@@ -320,7 +398,7 @@ Guidelines:
     console.error('Error in /api/extract:', error)
     return NextResponse.json(
       {
-        error: error.message || 'Internal server error',
+        error: error.message || 'Unknown server error during extraction',
         stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       },
       { status: 500 }

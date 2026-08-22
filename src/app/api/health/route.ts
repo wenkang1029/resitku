@@ -27,7 +27,7 @@ export async function GET() {
   }
 
   try {
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
 
     // getUser() with no session always hits the Supabase Auth endpoint.
     // Returns { data: { user: null }, error: null } when there's no session —
