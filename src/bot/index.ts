@@ -1,23 +1,40 @@
 import { Bot, InlineKeyboard } from 'grammy'
 import * as dotenv from 'dotenv'
 import * as path from 'path'
+import * as fs from 'fs'
 import { createClient } from '@supabase/supabase-js'
 
-// Load environment variables from .env.local
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
+// Load .env.local if present (for local development convenience)
+const localEnvPath = path.resolve(process.cwd(), '.env.local')
+if (fs.existsSync(localEnvPath)) {
+  dotenv.config({ path: localEnvPath })
+} else {
+  // Try default .env if present
+  dotenv.config()
+}
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 if (!BOT_TOKEN) {
-  console.error('ERROR: Missing TELEGRAM_BOT_TOKEN in .env.local')
+  console.error('CRITICAL ERROR: Missing TELEGRAM_BOT_TOKEN in process.env (or .env.local).')
   process.exit(1)
 }
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+if (!SUPABASE_URL) {
+  console.error('CRITICAL ERROR: Missing NEXT_PUBLIC_SUPABASE_URL in process.env.')
+  console.error('Please configure NEXT_PUBLIC_SUPABASE_URL in your deployment platform (e.g. Railway).')
+  process.exit(1)
+}
+
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+if (!SUPABASE_KEY) {
+  console.error('CRITICAL ERROR: Missing SUPABASE_SERVICE_ROLE_KEY (or NEXT_PUBLIC_SUPABASE_ANON_KEY) in process.env.')
+  console.error('Please configure SUPABASE_SERVICE_ROLE_KEY in your deployment platform (e.g. Railway).')
+  process.exit(1)
+}
+
 const API_URL = process.env.API_BASE_URL || 'http://localhost:3000'
-// NGROK_URL is used for web links in digest messages
 const WEB_URL = process.env.NGROK_URL || process.env.API_BASE_URL || 'http://localhost:3000'
-// Telegram chat ID to send digest messages (bot sends to linked user's chat)
 
 const bot = new Bot(BOT_TOKEN)
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
