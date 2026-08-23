@@ -14,10 +14,12 @@ import {
   FilingProfile,
   getApplicableCategoryKeys,
 } from '@/lib/relief/applicableCategories'
+import Link from 'next/link'
 import {
   ChevronDown,
   ChevronUp,
   Layers,
+  AlertTriangle,
 } from 'lucide-react'
 
 function formatRM(amount: number): string {
@@ -43,7 +45,9 @@ export default function ReliefPage() {
       try {
         const [rulesRes, receiptsRes, profileRes] = await Promise.all([
           fetch(`/api/rules?year=${selectedYear}`).then((r) => r.json()),
-          fetch('/api/receipts').then((r) => r.json()),
+          // include_line_items=true embeds line items so calculateRelief can attribute
+          // each item to its OWN relief_category (correct for mixed-category receipts).
+          fetch('/api/receipts?include_line_items=true').then((r) => r.json()),
           fetch('/api/profile').then((r) => r.json()).catch(() => ({ filing_profile: null })),
         ])
 
@@ -196,6 +200,43 @@ export default function ReliefPage() {
       />
 
       <main className="px-4 py-6 space-y-6 flex-1 max-w-5xl">
+        {/* Unmapped Categories Warning Banner */}
+        {result.unmapped_category_warnings && result.unmapped_category_warnings.length > 0 && (
+          <div className="bg-[#FEF2F2] border border-[#FCA5A5] rounded-2xl p-4 shadow-sm text-xs text-[#991B1B] space-y-2">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className="w-5 h-5 text-[#EF4444] shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-bold text-sm text-[#991B1B]">
+                  {result.unmapped_category_warnings.length} Line Item(s) with Unmapped Tax Relief Category
+                </p>
+                <p className="text-xs text-[#7F1D1D] leading-relaxed">
+                  These items were not counted in your tax relief totals because their assigned relief categories do not match any active LHDN relief rules for YA {selectedYear}.
+                </p>
+              </div>
+            </div>
+            <div className="divide-y divide-[#FECACA] border-t border-[#FECACA] pt-2">
+              {result.unmapped_category_warnings.map((w, idx) => (
+                <div key={idx} className="py-1.5 flex justify-between items-center text-[11px]">
+                  <div>
+                    <span className="font-semibold text-[#111827]">{w.item_description}</span>
+                    <span className="text-[#6B7280]"> ({w.merchant || 'Unknown'})</span>
+                    <span className="block text-[#DC2626] font-mono text-[10px]">Unknown category: "{w.relief_category}"</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-[#111827]">{formatRM(w.item_amount)}</span>
+                    <Link
+                      href={`/dashboard/receipts/${w.receipt_id}`}
+                      className="block text-[#2563EB] hover:underline text-[10px]"
+                    >
+                      View Receipt →
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Key Numbers Headline Section (Apple-style summary cards) */}
         <section className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
           <div className="col-span-2 md:col-span-1 bg-white border border-[#E2E8F0] rounded-2xl p-4 md:p-5 shadow-sm">

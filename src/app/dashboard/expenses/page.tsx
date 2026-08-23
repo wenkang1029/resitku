@@ -34,6 +34,7 @@ interface ReceiptRow {
   id: string
   merchant: string | null
   total_amount: number | null
+  claimed_amount: number | null   // null = nothing excluded; use total_amount
   transaction_date: string | null
   spending_category: string | null
   relief_category: string | null
@@ -115,7 +116,8 @@ export default function ExpensesPage() {
   })
 
   const totalSpent = yearReceipts.reduce(
-    (acc, r) => acc + (Number(r.total_amount) || 0),
+    // COALESCE: use claimed_amount (excluded items removed) when set, else full total
+    (acc, r) => acc + (Number(r.claimed_amount ?? r.total_amount) || 0),
     0
   )
 
@@ -125,7 +127,8 @@ export default function ExpensesPage() {
       if (!r.transaction_date) return false
       return new Date(r.transaction_date).getMonth() === idx
     })
-    const total = monthReceipts.reduce((acc, r) => acc + (Number(r.total_amount) || 0), 0)
+    const total = monthReceipts.reduce(
+      (acc, r) => acc + (Number(r.claimed_amount ?? r.total_amount) || 0), 0)
     return {
       name: m,
       total: Number(total.toFixed(2)),
@@ -135,7 +138,7 @@ export default function ExpensesPage() {
   const categoryTotals: Record<string, number> = {}
   for (const r of yearReceipts) {
     const cat = r.spending_category || 'other'
-    categoryTotals[cat] = (categoryTotals[cat] || 0) + (Number(r.total_amount) || 0)
+    categoryTotals[cat] = (categoryTotals[cat] || 0) + (Number(r.claimed_amount ?? r.total_amount) || 0)
   }
 
   const categoryList = Object.entries(categoryTotals)

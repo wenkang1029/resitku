@@ -336,8 +336,10 @@ Guidelines:
       }
     }
 
-    // Determine status: if flagged with reviewReasons (including duplicate/date discrepancy), pending_review
-    const status = needsReview ? 'pending_review' : 'confirmed'
+    // Universal confirm flow: ALL receipts start as pending_review.
+    // The user must explicitly confirm via Telegram or web dashboard.
+    // auto_confirmed is only set to true by the 7-day maintenance job.
+    const status = 'pending_review'
 
     // 6. Insert into Supabase receipts & receipt_line_items via insert_receipt_admin RPC
     let insertedReceipt = null

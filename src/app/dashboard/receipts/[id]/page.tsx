@@ -168,11 +168,21 @@ export default function ReceiptDetailPage() {
               <div className="flex justify-between items-start">
                 <div>
                   <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">
-                    Total Paid
+                    {receipt.claimed_amount != null ? 'Claimed Amount' : 'Total Paid'}
                   </span>
                   <p className="text-3xl font-extrabold text-[#0F172A] tracking-tight mt-0.5 tabular-nums">
-                    {formatRM(Number(receipt.total_amount || 0))}
+                    {formatRM(Number(receipt.claimed_amount ?? receipt.total_amount ?? 0))}
                   </p>
+                  {/* Show original total when items were excluded */}
+                  {receipt.claimed_amount != null && (
+                    <p className="text-xs text-[#64748B] mt-1">
+                      Receipt total: <span className="font-semibold text-[#0F172A]">{formatRM(Number(receipt.total_amount || 0))}</span>
+                      {' · '}
+                      <span className="text-[#D97706] font-medium">
+                        {lineItems.filter((li: any) => !li.include_in_records).length} item(s) excluded
+                      </span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="mt-1">
@@ -221,13 +231,27 @@ export default function ReceiptDetailPage() {
                   Line Items Breakdown
                 </h3>
                 <div className="divide-y divide-[#F1F5F9]">
-                  {lineItems.map((item) => (
-                    <div key={item.id} className="py-2.5 flex justify-between items-center text-xs">
+                  {lineItems.map((item: any) => (
+                    <div
+                      key={item.id}
+                      className={`py-2.5 flex justify-between items-center text-xs ${
+                        item.include_in_records === false ? 'opacity-40' : ''
+                      }`}
+                    >
                       <div className="pr-2">
-                        <p className="font-medium text-[#0F172A]">{item.description}</p>
+                        <p className="font-medium text-[#0F172A] flex items-center gap-1">
+                          {item.description}
+                          {item.include_in_records === false && (
+                            <span className="text-[10px] font-semibold text-[#D97706] bg-[#FEF3C7] px-1.5 py-0.5 rounded-full">
+                              excluded
+                            </span>
+                          )}
+                        </p>
                         <p className="text-[10px] text-[#64748B] capitalize">{item.spending_category}</p>
                       </div>
-                      <span className="font-semibold text-[#0F172A] tabular-nums">
+                      <span className={`font-semibold tabular-nums ${
+                        item.include_in_records === false ? 'line-through text-[#94A3B8]' : 'text-[#0F172A]'
+                      }`}>
                         {formatRM(Number(item.amount || 0))}
                       </span>
                     </div>

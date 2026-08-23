@@ -143,9 +143,9 @@ export default function PendingReviewPage() {
         <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-2xl p-4 flex items-start gap-3 shadow-sm">
           <AlertCircle className="w-5 h-5 text-[#D97706] shrink-0 mt-0.5" />
           <div className="text-xs text-[#92400E] space-y-0.5">
-            <p className="font-semibold text-sm">Review Flagged Receipts</p>
+            <p className="font-semibold text-sm">Confirm Before Counting</p>
             <p className="text-xs leading-relaxed opacity-90">
-              Verify receipt images and extracted categories before confirming them to your tax reports.
+              Every receipt needs your explicit confirmation before it counts toward your expense totals and tax relief claims. Auto-confirm kicks in after 7 days if left untouched.
             </p>
           </div>
         </div>

@@ -12,15 +12,36 @@ export interface ReliefRule {
   enforces_combined_cap: boolean
 }
 
+export interface ReceiptLineItem {
+  id: string
+  description: string
+  amount: number | null
+  spending_category: string | null
+  /** Each line item carries its own relief category, independent of the receipt level. */
+  relief_category: string | null
+  is_claimable: boolean
+  /** false = user excluded this item at confirm time. */
+  include_in_records: boolean
+}
+
 export interface Receipt {
   id: string
+  merchant?: string | null
   total_amount: number | null
+  /** Set at confirm when items were excluded; null means nothing excluded — use total_amount. */
+  claimed_amount: number | null
   transaction_date: string | null
   spending_category: string | null
+  /**
+   * Receipt-level relief category — used ONLY as fallback when no line items are present.
+   * When line items exist, their individual relief_category fields are used instead (see below).
+   */
   relief_category: string | null
   status: 'pending_review' | 'confirmed'
   needs_review: boolean
   assessment_year: number | null
+  /** Embedded line items. Present when fetched with ?include_line_items=true. */
+  receipt_line_items?: ReceiptLineItem[]
 }
 
 export interface CategoryReliefProgress {
@@ -40,39 +61,113 @@ export interface ReliefCalculationResult {
   total_relief_claimed: number
   total_relief_available: number
   categories: CategoryReliefProgress[]
+  /**
+   * Non-empty when a line item's relief_category is not found in the active rules.
+   * These amounts are NOT counted anywhere — they are surfaced here so the
+   * dashboard can alert the user rather than silently dropping them.
+   */
+  unmapped_category_warnings: UnmappedCategoryWarning[]
+}
+
+export interface UnmappedCategoryWarning {
+  receipt_id: string
+  merchant: string | null
+  item_description: string
+  item_amount: number
+  relief_category: string
 }
 
 /**
  * Calculates Malaysian tax relief progress for confirmed receipts.
- * 
+ *
+ * Aggregation strategy:
+ * ─ If a receipt has embedded line items (receipt_line_items is non-empty):
+ *     → Aggregate each INCLUDED line item (include_in_records !== false) by its OWN
+ *       relief_category. This is the correct path for mixed-category receipts (e.g. a
+ *       pharmacy receipt with medical + lifestyle + none items).
+ * ─ If a receipt has NO line items (simple single-category receipt):
+ *     → Fall back to receipt-level relief_category + COALESCE(claimed_amount, total_amount).
+ *
+ * Why this matters:
+ *   A pharmacy receipt with receipt.relief_category = "medical" may contain line items with
+ *   different categories. Using the receipt-level field as a single bucket would misattribute
+ *   lifestyle items as medical claims, and would not correctly reflect which items were excluded.
+ *
  * Rules:
- * 1. Exclude receipts with status !== 'confirmed' or needs_review === true or relief_category === 'none'
- * 2. effectiveClaim = min(claimed, rule.limit_amount)
- * 3. If parent.enforces_combined_cap is true (e.g. medical_combined_umbrella):
- *    Cap the aggregate sum of all children against the parent limit_amount.
- * 4. Sub-caps under parents inherit cap constraints.
+ * 1. Exclude receipts with status !== 'confirmed' or needs_review === true.
+ * 2. effectiveClaim = min(claimed, rule.limit_amount).
+ * 3. If parent.enforces_combined_cap: cap aggregate of children against parent limit.
  */
 export function calculateReliefProgress(
   rules: ReliefRule[],
   receipts: Receipt[],
   assessmentYear: number = 2025
 ): ReliefCalculationResult {
-  // 1. Filter eligible confirmed receipts
+  // 1. Filter eligible confirmed receipts (universal across both paths)
   const eligibleReceipts = receipts.filter(
     (r) =>
       r.status === 'confirmed' &&
       !r.needs_review &&
-      r.relief_category &&
-      r.relief_category !== 'none' &&
       (r.assessment_year === assessmentYear || (!r.assessment_year && assessmentYear === 2025))
   )
 
-  // 2. Aggregate raw claims by category_key
+  // 2. Build claimedByCategory — the core aggregation
+  //
+  // PATH A — Line-item-level (preferred):
+  //   Used when the receipt has embedded line items. Each included item is attributed
+  //   to its own relief_category, so mixed-category receipts are handled correctly.
+  //   Items with include_in_records = false are silently skipped.
+  //   Items with relief_category = "none" or null don't contribute to any relief bucket.
+  //
+  // PATH B — Receipt-level fallback:
+  //   Used when no line items are present. Uses receipt.relief_category (must be non-none)
+  //   and COALESCE(claimed_amount, total_amount) as the amount.
+
+  // Build set of all known category_keys from the provided rules (including 'none').
+  // This is the ground truth for what is a valid category.
+  const knownCategoryKeys = new Set(rules.map((r) => r.category_key))
+  // Unmapped warnings accumulator — amounts here are NOT counted in any bucket.
+  const unmappedWarnings: UnmappedCategoryWarning[] = []
+
   const claimedByCategory: Record<string, number> = {}
+
   for (const receipt of eligibleReceipts) {
-    const key = receipt.relief_category!
-    const amt = Number(receipt.total_amount) || 0
-    claimedByCategory[key] = (claimedByCategory[key] || 0) + amt
+    const lineItems = receipt.receipt_line_items
+
+    if (lineItems && lineItems.length > 0) {
+      // ── PATH A: per-item attribution ──────────────────────────────────────────────
+      for (const item of lineItems) {
+        // Skip excluded items (toggled off by user at confirm time)
+        if (item.include_in_records === false) continue
+
+        const cat = item.relief_category
+        if (!cat || cat === 'none') continue
+
+        // ⚠️ UNMAPPED CATEGORY: not in active relief_rules.
+        // Record a warning and skip — do NOT silently add to any bucket.
+        if (!knownCategoryKeys.has(cat)) {
+          unmappedWarnings.push({
+            receipt_id: receipt.id,
+            merchant: receipt.merchant ?? null,
+            item_description: item.description,
+            item_amount: Number(item.amount) || 0,
+            relief_category: cat,
+          })
+          continue
+        }
+
+        const amt = Number(item.amount) || 0
+        claimedByCategory[cat] = (claimedByCategory[cat] || 0) + amt
+      }
+    } else {
+      // ── PATH B: receipt-level fallback ────────────────────────────────────────
+      const cat = receipt.relief_category
+      if (!cat || cat === 'none') continue
+
+      // COALESCE: claimed_amount is set when items were excluded; otherwise use original total
+      const amt = Number(receipt.claimed_amount ?? receipt.total_amount) || 0
+      claimedByCategory[cat] = (claimedByCategory[cat] || 0) + amt
+    }
   }
 
   // 3. Separate top-level root rules vs children
@@ -114,7 +209,6 @@ export function calculateReliefProgress(
           childProgressList.push(childProgress)
           parentBudgetRemaining = Math.max(0, parentBudgetRemaining - childProgress.claimed_effective)
         }
-        // Total effective claim for this umbrella is sum of its children's effective claims
         const sumChildren = childProgressList.reduce((acc, c) => acc + c.claimed_effective, 0)
         effectiveClaim = Math.min(sumChildren + rawClaimed, rule.limit_amount !== null ? Number(rule.limit_amount) : sumChildren)
       } else {
@@ -155,5 +249,6 @@ export function calculateReliefProgress(
     total_relief_claimed: totalReliefClaimed,
     total_relief_available: totalReliefAvailable,
     categories,
+    unmapped_category_warnings: unmappedWarnings,
   }
 }

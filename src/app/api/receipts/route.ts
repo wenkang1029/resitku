@@ -7,6 +7,7 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get('status') || null
     const yearStr = searchParams.get('year')
     const year = yearStr ? Number(yearStr) : null
+    const includeLineItems = searchParams.get('include_line_items') === 'true'
 
     // Session-aware client with active user cookies — strictly governed by RLS (auth.uid() = user_id)
     const supabase = await createServerClient()
@@ -17,9 +18,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized. Please sign in.' }, { status: 401 })
     }
 
+    // When include_line_items=true, use PostgREST embed to include line items in one query.
+    // The embedded array key will be 'receipt_line_items'.
+    const selectClause = includeLineItems
+      ? '*, receipt_line_items(id, description, amount, spending_category, relief_category, is_claimable, include_in_records)'
+      : '*'
+
     let query = supabase
       .from('receipts')
-      .select('*')
+      .select(selectClause)
       .order('transaction_date', { ascending: false, nullsFirst: false })
 
     if (status) {

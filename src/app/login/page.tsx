@@ -33,8 +33,7 @@ export default function LoginPage() {
       }
 
       if (data.session) {
-        router.push(redirectTo)
-        router.refresh()
+        window.location.href = redirectTo
       }
     } catch (err: any) {
       console.error('Login error:', err)
