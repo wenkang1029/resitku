@@ -128,8 +128,8 @@ function buildConfirmCard(opts: ConfirmCardOptions): { text: string; keyboard: I
         reviewBlock
 
       keyboard
-        .text('✅ Confirm', `confirm:${receiptId}`)
-        .text('✏️ Edit Details', `edit:${receiptId}`)
+        .text('✅ Confirm', `c:${receiptId}`)
+        .text('✏️ Edit Details', `e:${receiptId}`)
 
       return { text, keyboard }
     }
@@ -158,18 +158,18 @@ function buildConfirmCard(opts: ConfirmCardOptions): { text: string; keyboard: I
       `<b>Included Total: RM ${includedTotal.toFixed(2)}</b>` +
       reviewBlock
 
-    // One toggle button per line item
+    // One toggle button per line item using 0-based index `t:<receiptId>:<index>` (~43 bytes)
     lineItems.forEach((li, i) => {
       const incl = states.get(li.id) !== false
       const icon = incl ? '✅' : '❌'
       const label = `${icon} ${truncate(li.description)}`
-      keyboard.text(label, `toggle:${receiptId}:${li.id}`)
+      keyboard.text(label, `t:${receiptId}:${i}`)
       if ((i + 1) % 2 === 0) keyboard.row()
     })
 
     keyboard.row()
-      .text('✅ Confirm', `confirm:${receiptId}`)
-      .text('✏️ Edit Details', `edit:${receiptId}`)
+      .text('✅ Confirm', `c:${receiptId}`)
+      .text('✏️ Edit Details', `e:${receiptId}`)
 
     return { text, keyboard }
   }
@@ -187,8 +187,8 @@ function buildConfirmCard(opts: ConfirmCardOptions): { text: string; keyboard: I
     reviewBlock
 
   keyboard
-    .text('✅ Confirm All', `confirm:${receiptId}`)
-    .text('🌐 Review on Web', `webview:${receiptId}`)
+    .text('✅ Confirm All', `c:${receiptId}`)
+    .text('🌐 Review on Web', `w:${receiptId}`)
 
   return { text, keyboard }
 }
@@ -451,48 +451,63 @@ bot.on('message:photo', async (ctx) => {
 // CALLBACK HANDLERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Toggle line item inclusion
-bot.callbackQuery(/^toggle:([^:]+):(.+)$/, async (ctx) => {
+// Toggle line item inclusion: matches `t:<receiptId>:<itemIndex>` or legacy `toggle:<receiptId>:<itemId>`
+bot.callbackQuery(/^(?:t|toggle):([^:]+):(.+)$/, async (ctx) => {
   const receiptId = ctx.match[1]
-  const itemId = ctx.match[2]
+  const indexOrId = ctx.match[2]
   const msgId = ctx.callbackQuery.message?.message_id
   const chatId = ctx.chat?.id
   if (!msgId || !chatId) { await ctx.answerCallbackQuery(); return }
 
   const sessionKey = `${chatId}:${msgId}`
-  let states = toggleSessions.get(sessionKey)
 
+  // Fetch current line items from DB
+  const { data: lineItems } = await supabase
+    .from('receipt_line_items')
+    .select('id, description, amount, is_claimable, include_in_records')
+    .eq('receipt_id', receiptId)
+
+  if (!lineItems || lineItems.length === 0) {
+    await ctx.answerCallbackQuery({ text: 'Receipt line items not found.' })
+    return
+  }
+
+  // Resolve target item by index (if numeric) or direct ID (if legacy UUID)
+  let targetItem = null
+  const itemIndex = parseInt(indexOrId, 10)
+  if (!isNaN(itemIndex) && itemIndex >= 0 && itemIndex < lineItems.length) {
+    targetItem = lineItems[itemIndex]
+  } else {
+    targetItem = lineItems.find((li: any) => li.id === indexOrId)
+  }
+
+  if (!targetItem) {
+    await ctx.answerCallbackQuery({ text: 'Item not found.' })
+    return
+  }
+
+  let states = toggleSessions.get(sessionKey)
   if (!states) {
-    // Rebuild from DB on restart — because we write include_in_records immediately
-    // on every tap, the DB is always the source of truth and restarts lose nothing.
-    const { data: existingItems } = await supabase
-      .from('receipt_line_items').select('id, include_in_records').eq('receipt_id', receiptId)
-    states = new Map((existingItems || []).map((li: any) => [li.id, li.include_in_records !== false]))
+    states = new Map(lineItems.map((li: any) => [li.id, li.include_in_records !== false]))
     toggleSessions.set(sessionKey, states)
   }
 
-  // Toggle the tapped item in memory
-  const current = states.get(itemId) !== false
+  // Toggle the tapped item in memory & database
+  const current = states.get(targetItem.id) !== false
   const newValue = !current
-  states.set(itemId, newValue)
+  states.set(targetItem.id, newValue)
 
-  // ── WRITE TO DB IMMEDIATELY ──────────────────────────────────────────────
-  // This makes the DB the live source of truth. A bot restart mid-session
-  // will rebuild states correctly from DB, losing nothing.
+  // Write directly to DB
   await supabase
     .from('receipt_line_items')
     .update({ include_in_records: newValue })
-    .eq('id', itemId)
-  // ────────────────────────────────────────────────────────────────────────
+    .eq('id', targetItem.id)
 
   // Fetch receipt data to rebuild card
   const { data: receipt } = await supabase
     .from('receipts')
     .select('id, merchant, total_amount, transaction_date, spending_category, relief_category, needs_review, possible_duplicate')
     .eq('id', receiptId).single()
-
-  const { data: lineItems } = await supabase
-    .from('receipt_line_items').select('id, description, amount, is_claimable, include_in_records').eq('receipt_id', receiptId)
 
   if (!receipt) { await ctx.answerCallbackQuery({ text: 'Receipt not found.' }); return }
 
@@ -517,8 +532,8 @@ bot.callbackQuery(/^toggle:([^:]+):(.+)$/, async (ctx) => {
   } catch {}
 })
 
-// Confirm button — writes claimed_amount (included-items sum) then confirms
-bot.callbackQuery(/^confirm:(.+)$/, async (ctx) => {
+// Confirm button: matches `c:<receiptId>` or legacy `confirm:<receiptId>`
+bot.callbackQuery(/^(?:c|confirm):(.+)$/, async (ctx) => {
   const receiptId = ctx.match[1]
   const msgId = ctx.callbackQuery.message?.message_id
   const chatId = ctx.chat?.id
@@ -571,8 +586,8 @@ bot.callbackQuery(/^confirm:(.+)$/, async (ctx) => {
   }
 })
 
-// Web view button — sends link for Path B (>6 items)
-bot.callbackQuery(/^webview:(.+)$/, async (ctx) => {
+// Web view button: matches `w:<receiptId>` or legacy `webview:<receiptId>`
+bot.callbackQuery(/^(?:w|webview):(.+)$/, async (ctx) => {
   const receiptId = ctx.match[1]
   await ctx.answerCallbackQuery()
   await ctx.reply(
@@ -583,8 +598,8 @@ bot.callbackQuery(/^webview:(.+)$/, async (ctx) => {
   )
 })
 
-// Edit button
-bot.callbackQuery(/^edit:(.+)$/, async (ctx) => {
+// Edit button: matches `e:<receiptId>` or legacy `edit:<receiptId>`
+bot.callbackQuery(/^(?:e|edit):(.+)$/, async (ctx) => {
   const receiptId = ctx.match[1]
   await ctx.answerCallbackQuery()
   await ctx.reply(
