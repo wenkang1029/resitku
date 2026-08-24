@@ -682,31 +682,18 @@ bot.callbackQuery(/^(?:c|confirm):(.+)$/, async (ctx) => {
   const sessionKey = msgId && chatId ? `${chatId}:${msgId}` : null
 
   try {
-    // include_in_records is already correct in the DB (written on each tap).
-    // Compute the included-items sum to store in claimed_amount.
+    // Confirm receipt via RPC — automatically calculates and stores claimed_amount
+    // if any line items were excluded (include_in_records = false).
+    const { data: confirmedReceipt, error } = await supabase.rpc('confirm_receipt_admin', { p_receipt_id: receiptId })
+    if (error) throw error
+
+    // Fetch line item counts for confirmation note
     const { data: lineItems } = await supabase
       .from('receipt_line_items')
-      .select('id, amount, include_in_records')
+      .select('id, include_in_records')
       .eq('receipt_id', receiptId)
 
-    const hasLineItems = lineItems && lineItems.length > 0
-    const includedItems = (lineItems || []).filter((li: any) => li.include_in_records !== false)
-    const excludedCount = (lineItems || []).length - includedItems.length
-
-    // Write claimed_amount ONLY if items were excluded.
-    // total_amount is NEVER mutated — it stays as the original document total.
-    // Dashboards use COALESCE(claimed_amount, total_amount) for correct figures.
-    if (hasLineItems && excludedCount > 0) {
-      const includedTotal = includedItems.reduce((sum: number, li: any) => sum + Number(li.amount || 0), 0)
-      await supabase
-        .from('receipts')
-        .update({ claimed_amount: includedTotal })
-        .eq('id', receiptId)
-    }
-
-    // Confirm receipt via RPC (sets status = 'confirmed', needs_review = false)
-    const { error } = await supabase.rpc('confirm_receipt_admin', { p_receipt_id: receiptId })
-    if (error) throw error
+    const excludedCount = (lineItems || []).filter((li) => li.include_in_records === false).length
 
     // Clean up in-memory session
     if (sessionKey) toggleSessions.delete(sessionKey)

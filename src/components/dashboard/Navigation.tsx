@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { ReceiptText, ShieldCheck, Clock, Settings } from 'lucide-react'
 
 import { useAssessmentYear } from '@/context/YearContext'
+import { ChevronDown } from 'lucide-react'
 
 interface NavigationProps {
   pendingCount?: number
@@ -13,7 +14,7 @@ interface NavigationProps {
 
 export function Navigation({ pendingCount = 0 }: NavigationProps) {
   const pathname = usePathname()
-  const { selectedYear } = useAssessmentYear()
+  const { selectedYear, setSelectedYear, availableYears } = useAssessmentYear()
 
   const navItems = [
     {
@@ -51,11 +52,25 @@ export function Navigation({ pendingCount = 0 }: NavigationProps) {
           <div className="px-3 flex items-center justify-between">
             <div>
               <span className="text-xl font-black text-[#0F172A] tracking-tight">ResitKu</span>
-              <span className="block text-[11px] text-[#64748B]">Personal Expense & Tax</span>
+              <span className="block text-[11px] text-[#64748B]">Personal Expense &amp; Tax</span>
             </div>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#F1F5F9] text-[#64748B]">
-              YA {selectedYear}
-            </span>
+            
+            {/* Interactive Assessment Year Selector in Left Sidebar */}
+            <div className="relative inline-flex items-center">
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="appearance-none bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#0F172A] font-bold text-[11px] pl-2.5 pr-6 py-1 rounded-full border border-[#CBD5E1] transition-colors cursor-pointer focus:outline-hidden focus:ring-1 focus:ring-[#0052FF]"
+                title="Change Assessment Year"
+              >
+                {availableYears.map((y) => (
+                  <option key={y} value={y}>
+                    YA {y}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-3 h-3 text-[#64748B] absolute right-1.5 pointer-events-none" />
+            </div>
           </div>
 
           <nav className="space-y-1">

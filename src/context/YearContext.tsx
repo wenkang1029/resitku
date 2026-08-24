@@ -13,26 +13,38 @@ const YearContext = createContext<YearContextType | undefined>(undefined)
 const DEFAULT_YEAR = 2025
 const AVAILABLE_YEARS = [2026, 2025, 2024]
 
+import { supabase } from '@/lib/supabase/client'
+
 export function YearProvider({ children }: { children: React.ReactNode }) {
   const [selectedYear, setSelectedYearState] = useState<number>(DEFAULT_YEAR)
+  const [userId, setUserId] = useState<string | null>(null)
 
-  // Initialize from localStorage or fallback
+  // Initialize from user-scoped localStorage or fallback
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('resitku_selected_ya')
-      if (stored) {
-        const parsed = parseInt(stored, 10)
-        if (AVAILABLE_YEARS.includes(parsed)) {
-          setSelectedYearState(parsed)
+    async function initUser() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        const uid = user?.id || 'guest'
+        setUserId(uid)
+
+        const storageKey = `resitku_selected_ya_${uid}`
+        const stored = localStorage.getItem(storageKey) || localStorage.getItem('resitku_selected_ya')
+        if (stored) {
+          const parsed = parseInt(stored, 10)
+          if (AVAILABLE_YEARS.includes(parsed)) {
+            setSelectedYearState(parsed)
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
+    initUser()
   }, [])
 
   const setSelectedYear = (year: number) => {
     setSelectedYearState(year)
     try {
-      localStorage.setItem('resitku_selected_ya', year.toString())
+      const uid = userId || 'guest'
+      localStorage.setItem(`resitku_selected_ya_${uid}`, year.toString())
     } catch {}
   }
 

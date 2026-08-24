@@ -11,7 +11,7 @@ interface HeaderProps {
 }
 
 export function DashboardHeader({ title, subtitle }: HeaderProps) {
-  const { selectedYear, setSelectedYear, availableYears } = useAssessmentYear()
+  const { selectedYear } = useAssessmentYear()
 
   return (
     <header className="sticky top-0 z-40 bg-[#FAFAFA]/95 backdrop-blur border-b border-[#E2E8F0] px-4 py-3 flex items-center justify-between">
@@ -22,22 +22,11 @@ export function DashboardHeader({ title, subtitle }: HeaderProps) {
       <div className="flex items-center gap-2.5">
         <QuickUploadModal />
         
-        {/* Synced Global Assessment Year Selector in Navbar */}
-        <div className="relative inline-flex items-center">
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="appearance-none bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#0F172A] font-bold text-xs pl-3 pr-7 py-1.5 rounded-full border border-[#CBD5E1] transition-colors cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-[#0052FF]"
-            title="Change Assessment Year"
-          >
-            {availableYears.map((y) => (
-              <option key={y} value={y}>
-                YA {y}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="w-3.5 h-3.5 text-[#64748B] absolute right-2 pointer-events-none" />
-        </div>
+        {/* Static Display of Selected Assessment Year in Top Bar */}
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#F1F5F9] text-[#0F172A] border border-[#CBD5E1]">
+          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+          YA {selectedYear}
+        </span>
       </div>
     </header>
   )

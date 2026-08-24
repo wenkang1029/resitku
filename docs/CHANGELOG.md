@@ -4,10 +4,12 @@ All notable changes and architectural decisions for **ResitKu** are documented h
 
 ---
 
-## 2026-08-24 — Global Assessment Year Sync & Navbar Centralization
-- **Global Assessment Year Context (`src/context/YearContext.tsx`):** Created `YearProvider` with persistent `localStorage` support (`resitku_selected_ya`) syncing the selected Assessment Year (`2026`, `2025`, `2024`) across the entire web application.
-- **Navbar Centralization (`DashboardHeader.tsx` & `Navigation.tsx`):** Replaced static `YA 2025` pill with an interactive, accessible `<select>` dropdown in the sticky top navbar. Synced the desktop sidebar badge dynamically.
-- **Removed Duplicate In-Page Year Selectors:** Removed redundant in-page year cycle buttons from `/dashboard/expenses` and `/dashboard/relief`, replacing them with clear static `YA <year>` badges while delegating all year switching strictly to the top navbar.
+## 2026-08-24 — RPC `claimed_amount` Consolidation & Sidebar Assessment Year Selector
+- **`confirm_receipt_admin` RPC Consolidation (`009_confirm_receipt_rpc_claimed_amount.sql`):** Moved the `claimed_amount = SUM(amount WHERE include_in_records = true)` logic directly inside PostgreSQL. Guarantees 100% identical behavior across Web dashboard and Telegram bot confirm paths.
+- **Telegram Bot Cleanup (`src/bot/index.ts`):** Removed redundant TypeScript `claimed_amount` summation logic and now relies exclusively on the database RPC.
+- **Left Sidebar Assessment Year Selector (`src/components/dashboard/Navigation.tsx`):** Placed the interactive `<select>` dropdown inside the left desktop sidebar. Top bar (`DashboardHeader.tsx`) now displays a clean, static `YA <year>` indicator.
+- **Per-User Scoped Storage (`src/context/YearContext.tsx`):** Scoped localStorage key to `resitku_selected_ya_<userId>` to ensure strict isolation across different user sessions on shared devices.
+
 
 
 
