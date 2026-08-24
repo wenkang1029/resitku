@@ -74,10 +74,12 @@ function formatRM(amount: number): string {
   })}`
 }
 
+import { useAssessmentYear } from '@/context/YearContext'
+
 export default function ExpensesPage() {
   const [receipts, setReceipts] = useState<ReceiptRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedYear, setSelectedYear] = useState(2025)
+  const { selectedYear } = useAssessmentYear()
 
   useEffect(() => {
     async function loadData() {
@@ -96,17 +98,6 @@ export default function ExpensesPage() {
     }
     loadData()
   }, [])
-
-  // Extract available years from receipts dynamically
-  const availableYears = Array.from(
-    new Set(
-      receipts
-        .map((r) => (r.transaction_date ? new Date(r.transaction_date).getFullYear() : null))
-        .filter((y): y is number => y !== null)
-    )
-  ).sort((a, b) => b - a)
-
-  const displayYears = Array.from(new Set([...availableYears, 2025, 2026])).sort((a, b) => b - a)
 
   const yearReceipts = receipts.filter((r) => {
     if (r.transaction_date) {
@@ -151,7 +142,7 @@ export default function ExpensesPage() {
 
   return (
     <>
-      <DashboardHeader title="Expenses" subtitle={`Spending overview for ${selectedYear}`} />
+      <DashboardHeader title="Expenses" subtitle={`Spending overview for YA ${selectedYear}`} />
 
       <main className="px-4 py-6 space-y-6 flex-1 max-w-5xl">
         {/* Total Expenses Card */}
@@ -160,21 +151,9 @@ export default function ExpensesPage() {
             <span className="text-xs font-semibold text-[#64748B] tracking-tight">
               Total Expenses
             </span>
-            <div className="flex gap-1 text-[11px] flex-wrap">
-              {displayYears.map((y) => (
-                <button
-                  key={y}
-                  onClick={() => setSelectedYear(y)}
-                  className={`px-2 py-0.5 rounded-md font-medium transition-colors ${
-                    selectedYear === y
-                      ? 'bg-[#0052FF] text-white'
-                      : 'bg-[#F1F5F9] text-[#64748B] hover:text-[#0F172A]'
-                  }`}
-                >
-                  {y}
-                </button>
-              ))}
-            </div>
+            <span className="text-xs font-bold text-[#0052FF] bg-[#EFF6FF] px-2.5 py-0.5 rounded-full">
+              YA {selectedYear}
+            </span>
           </div>
           <p className="text-3xl md:text-4xl font-extrabold text-[#0F172A] tracking-tight mt-1 tabular-nums">
             {formatRM(totalSpent)}

@@ -14,6 +14,7 @@ import {
   FilingProfile,
   getApplicableCategoryKeys,
 } from '@/lib/relief/applicableCategories'
+import { useAssessmentYear } from '@/context/YearContext'
 import Link from 'next/link'
 import {
   ChevronDown,
@@ -33,7 +34,7 @@ function formatRM(amount: number): string {
 }
 
 export default function ReliefPage() {
-  const [selectedYear, setSelectedYear] = useState(2025)
+  const { selectedYear } = useAssessmentYear()
   const [rules, setRules] = useState<ReliefRule[]>([])
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [profile, setProfile] = useState<FilingProfile | null>(null)
@@ -74,14 +75,23 @@ export default function ReliefPage() {
     ? result.categories.filter((c) => applicableKeys.includes(c.category_key))
     : result.categories
 
-  const activeCategories = filteredCategories.filter((c) => c.claimed_effective > 0)
-  const zeroCategories = filteredCategories.filter((c) => c.claimed_effective === 0)
+  // Top-level categories: no parent AND has a valid limit (or is an umbrella parent with subcaps)
+  const topLevelCategories = filteredCategories.filter(
+    (c) => c.limit_amount !== null || c.sub_caps.length > 0
+  )
+
+  const activeCategories = topLevelCategories.filter((c) => c.claimed_effective > 0)
+  const zeroCategories = topLevelCategories.filter((c) => c.claimed_effective === 0)
 
   // Top category by usage
   const topCategory = [...result.categories].sort((a, b) => b.claimed_effective - a.claimed_effective)[0]
 
-  const toggleSubcap = (key: string) => {
-    setExpandedSubcaps((prev) => ({ ...prev, [key]: !prev[key] }))
+  const toggleSubcap = (ruleId: string) => {
+    setExpandedSubcaps((prev) => ({ ...prev, [ruleId]: !prev[ruleId] }))
+  }
+
+  const exportCSV = () => {
+    window.location.href = `/api/export?year=${selectedYear}&format=csv`
   }
 
   const renderCategoryCard = (cat: CategoryReliefProgress) => {
@@ -247,21 +257,9 @@ export default function ReliefPage() {
               <span className="text-xs font-semibold text-[#64748B] tracking-tight">
                 Total Claimed
               </span>
-              <div className="flex gap-1 text-[11px]">
-                {[2024, 2025, 2026].map((y) => (
-                  <button
-                    key={y}
-                    onClick={() => setSelectedYear(y)}
-                    className={`px-2 py-0.5 rounded-md font-medium transition-colors ${
-                      selectedYear === y
-                        ? 'bg-[#0052FF] text-white'
-                        : 'bg-[#F1F5F9] text-[#64748B] hover:text-[#0F172A]'
-                    }`}
-                  >
-                    {y}
-                  </button>
-                ))}
-              </div>
+              <span className="text-xs font-bold text-[#0052FF] bg-[#EFF6FF] px-2.5 py-0.5 rounded-full">
+                YA {selectedYear}
+              </span>
             </div>
             <p className="text-2xl md:text-3xl font-extrabold text-[#0F172A] tracking-tight mt-1 tabular-nums">
               {formatRM(result.total_relief_claimed)}

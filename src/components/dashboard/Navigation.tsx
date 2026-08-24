@@ -5,12 +5,15 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ReceiptText, ShieldCheck, Clock, Settings } from 'lucide-react'
 
+import { useAssessmentYear } from '@/context/YearContext'
+
 interface NavigationProps {
   pendingCount?: number
 }
 
 export function Navigation({ pendingCount = 0 }: NavigationProps) {
   const pathname = usePathname()
+  const { selectedYear } = useAssessmentYear()
 
   const navItems = [
     {
@@ -51,7 +54,7 @@ export function Navigation({ pendingCount = 0 }: NavigationProps) {
               <span className="block text-[11px] text-[#64748B]">Personal Expense & Tax</span>
             </div>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#F1F5F9] text-[#64748B]">
-              YA 2025
+              YA {selectedYear}
             </span>
           </div>
 

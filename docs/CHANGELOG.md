@@ -4,8 +4,11 @@ All notable changes and architectural decisions for **ResitKu** are documented h
 
 ---
 
-## 2026-08-24 — Dynamic Assessment Year Fallback Fix
-- **Extraction Route Correctness Fix (`src/app/api/extract/route.ts`):** Replaced hardcoded `const targetYear = 2026` with dynamic `const targetYear = new Date().getFullYear()`. Eliminates the risk of undated receipts being misattributed to 2026 when future calendar years (2027+) begin.
+## 2026-08-24 — Global Assessment Year Sync & Navbar Centralization
+- **Global Assessment Year Context (`src/context/YearContext.tsx`):** Created `YearProvider` with persistent `localStorage` support (`resitku_selected_ya`) syncing the selected Assessment Year (`2026`, `2025`, `2024`) across the entire web application.
+- **Navbar Centralization (`DashboardHeader.tsx` & `Navigation.tsx`):** Replaced static `YA 2025` pill with an interactive, accessible `<select>` dropdown in the sticky top navbar. Synced the desktop sidebar badge dynamically.
+- **Removed Duplicate In-Page Year Selectors:** Removed redundant in-page year cycle buttons from `/dashboard/expenses` and `/dashboard/relief`, replacing them with clear static `YA <year>` badges while delegating all year switching strictly to the top navbar.
+
 
 
 
