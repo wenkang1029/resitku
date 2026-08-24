@@ -4,13 +4,12 @@ All notable changes and architectural decisions for **ResitKu** are documented h
 
 ---
 
-## 2026-08-24 — Image Compression & Assessment Year Override
-- **WebP Image Compression (`compressImage.ts`):** Added pipeline compression using `sharp` targeting max dimension `2048px` and WebP `88%` quality before uploading to Supabase Storage. Reduces storage footprint by ~50% without compromising legibility on small print / SST registration numbers.
-- **Assessment Year Override (Telegram & Web):**
-  - Added interactive inline cycle button `🗓️ YA <year>` on Telegram cards.
-  - Added dropdown selector on Web Receipt Detail page (`PATCH /api/receipts/[id]`).
-  - Atomically re-resolves and updates `rule_version_id` to match the selected tax year's active/draft rule.
-  - *Calculation & Backfill Architecture:* The Relief Dashboard (`calculateRelief.ts`) computes relief dynamically by matching `item.relief_category` / `receipt.relief_category` against `rules.category_key` for the chosen assessment year (it does not require a foreign-key join on `rule_version_id`). Once a new year's rules (e.g. YA2024/YA2026) are seeded in `relief_rules`, dashboard calculations activate immediately for receipts with `rule_version_id: null`. A lightweight backfill script/migration can optionally populate `receipts.rule_version_id` later to lock in the immutable historical audit reference (FR-4.3).
+## 2026-08-24 — Phase 8: Form BE Tax Relief Export (CSV & Print / PDF)
+- **Single Calculation Source of Truth (`exportRelief.ts`):** Built canonical exporter directly wrapping `calculateReliefProgress` from `calculateRelief.ts`. Ensures 100% mathematical parity across CSV download, Print / PDF view, and live dashboard.
+- **Form BE Export API (`GET /api/export`):** Supports `?format=csv` for direct Form BE structured CSV download and `?format=json` for print rendering. Correctly respects `include_in_records: false` and groups umbrella caps (e.g. `medical_combined_umbrella`) alongside their sub-caps.
+- **Dedicated Print / PDF Page (`/dashboard/relief/print`):** Clean, professional Form BE reference document with `@media print` rules, A4 page breaks, and one-click browser print / PDF saving.
+- **Tax Relief Dashboard Export Card:** Added action card on `/dashboard/relief` with instant CSV download and Print / Save PDF navigation, alongside a clear legal disclaimer.
+
 
 
 ---

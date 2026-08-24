@@ -20,6 +20,9 @@ import {
   ChevronUp,
   Layers,
   AlertTriangle,
+  FileText,
+  Download,
+  Printer,
 } from 'lucide-react'
 
 function formatRM(amount: number): string {
@@ -294,6 +297,43 @@ export default function ReliefPage() {
                 ? `${formatRM(topCategory.claimed_effective)} claimed`
                 : 'Start by uploading receipts'}
             </p>
+          </div>
+        </section>
+
+        {/* Form BE Export Action Card */}
+        <section className="bg-white border border-[#E2E8F0] rounded-2xl p-4 md:p-5 shadow-xs flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-[#0052FF]" />
+              <h3 className="text-sm font-bold text-[#0F172A] tracking-tight">
+                LHDN Form BE Reference Export (YA {selectedYear})
+              </h3>
+            </div>
+            <p className="text-[11px] text-[#64748B] max-w-xl">
+              Download or print an organized supporting summary matching Form BE relief line items.
+              <span className="block text-[#475569] font-medium mt-0.5">
+                Note: This export is for your personal reference and record-keeping — it does not submit anything to LHDN.
+              </span>
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 shrink-0">
+            <a
+              href={`/api/export?year=${selectedYear}&format=csv`}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#0F172A] bg-[#F1F5F9] hover:bg-[#E2E8F0] px-3.5 py-2 rounded-xl transition-colors min-h-[38px]"
+            >
+              <Download className="w-3.5 h-3.5 text-[#64748B]" />
+              CSV
+            </a>
+
+            <Link
+              href={`/dashboard/relief/print?year=${selectedYear}`}
+              target="_blank"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-[#0052FF] hover:bg-[#0040CC] px-4 py-2 rounded-xl shadow-xs transition-colors min-h-[38px]"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              Print / Save PDF
+            </Link>
           </div>
         </section>
 

@@ -51,8 +51,8 @@
 - [ ] Test against a real mixed receipt — verify line items split correctly into separate `receipt_line_items` rows with correct `is_claimable` flags
 
 ### Phase 8 — Export
-- [ ] Task Antigravity: *"Build an export feature generating a CSV/PDF summary per assessment year, organized by relief category, for personal filing reference."*
-- [ ] Verify: exported totals match what's shown on the dashboard for the same year
+- [x] Task Antigravity: *"Build an export feature generating a CSV/PDF summary per assessment year, organized by relief category, for personal filing reference."*
+- [x] Verify: exported totals match what's shown on the dashboard for the same year
 
 ### Phase 9 — LLM-Assisted Rule Drafting (FR-4.4)
 - [ ] Task Antigravity: *"Build a rule-drafting workflow: accept a source document (PDF/text) of LHDN budget/guideline changes, use the LLM to produce a structured diff against the previous year's active rule_version, save as status: DRAFT, and build a review UI showing the diff with source references for human approval before it can be marked ACTIVE."*
