@@ -50,19 +50,25 @@ A personal finance tool where the primary loop is everyday expense tracking (cap
 - **FR-2.3** A receipt may have a spending category with no relief category (e.g. groceries), or both simultaneously.
 - **FR-2.4** *(v2)* Line-item level splitting for mixed receipts (e.g. pharmacy: medication vs. cosmetics on one bill).
 
-### FR-3: Extraction Confidence & Review
-- **FR-3.1** Confidence is **not** derived from an LLM self-reported score (unreliable — see §7). Instead, flag for manual review when:
-  - Extracted total is missing/unparseable
-  - Relief category is ambiguous against the active rule set
-  - MyInvois corroboration (if present) disagrees with LLM extraction
-- **FR-3.2** Flagged items surface as a simple confirm/edit card (Telegram inline buttons; dashboard edit view).
+### FR-3: Universal Review & Confirmation Flow
+- **FR-3.1** Universal "Pending Review" default: Every receipt processed (via Telegram bot or web) enters `status: 'pending_review'`. Receipts do not count toward expense or tax relief totals until confirmed via an explicit user action (or auto-confirmed after 7 days).
+- **FR-3.2** Heuristic Review Flags: In addition to the default pending state, `needs_review: true` and descriptive `review_reasons` are flagged when:
+  - Extracted total is missing, zero, or unparseable
+  - Line items sum differs from extracted total
+  - Date parsing detects ambiguity, future dates, or distant history (>2 years)
+  - Possible duplicate matches an existing transaction (same merchant, date, amount)
+  - Model notes ambiguity or unmapped relief categories are detected
+- **FR-3.3** Telegram Confirmation Card:
+  - Path A (≤6 line items): Inline toggle buttons per item (`include_in_records`), dynamic claimed total recalculation, assessment year cycle button, and Confirm action.
+  - Path B (>6 line items): High-level summary with "Confirm All" or "Review on Web" link.
+- **FR-3.4** Maintenance Background Job: Periodic 24-hour job that sends a 3-day reminder digest for pending receipts and auto-confirms receipts older than 7 days (`auto_confirmed: true`).
 
 ### FR-4: Tax Relief Rule Engine
 - **FR-4.1** Rules are stored per assessment year (`relief_rules_by_year`), not as a single flat list, since categories and limits change annually.
 - **FR-4.1a** *(v1)* **Profile-based personalization via structured filtering, not RAG.** A lightweight onboarding captures marital status, filing type (joint/separate), and dependent count. Applicable relief categories/limits are selected via simple deterministic conditionals against the rule table (e.g. spouse relief only if married + separate assessment; child education relief scaled by dependent count). This is a filter/lookup operation, not a retrieval problem — RAG is deliberately not used here (see §7). Pulled into v1 since it's cheap once the rule table exists and meaningfully improves relevance of what a user sees from day one.
-- **FR-4.2** *(v2)* Parent-child limit logic supported (e.g. total medical cap RM10,000, with an internal sub-cap for specific items). Full disability/parental-care-tier profile fields also added here, expanding on the basic v1 profile.
+- **FR-4.2** *(v2)* Parent-child limit logic supported (e.g. total medical cap RM10,000, with an internal sub-cap for specific items). `enforces_combined_cap` exists as an explicit boolean flag on `relief_rules` (not inferred from child count) to distinguish shared umbrella caps (like medical) from independent sub-caps (like EPF + life insurance under life_insurance_epf). Full disability/parental-care-tier profile fields also added here, expanding on the basic v1 profile.
 - **FR-4.3** Every receipt stores an immutable foreign-key reference to the exact `rule_version` active at the time it was categorized. Later rule corrections never silently alter historical records.
-- **FR-4.4** *(v2/v3)* **LLM-assisted rule drafting, human-approved:**
+- **FR-4.4** *(v2/v3 — Not yet implemented)* **LLM-assisted rule drafting, human-approved:**
   - LLM reads official source documents (Budget speech, Finance Bill, LHDN PIN guidelines) and proposes a **diff** against the prior year's rules, with each proposed change linked to its source reference.
   - Proposed changes are saved as `status: DRAFT` — never auto-published to `status: ACTIVE`.
   - A human (you) reviews the diff against the source and explicitly approves before it becomes the active rule set for that year.
@@ -71,7 +77,7 @@ A personal finance tool where the primary loop is everyday expense tracking (cap
 ### FR-5: Dashboards & Reporting
 - **FR-5.1** Expense view: monthly/category spending trends, general financial overview.
 - **FR-5.2** Relief view: category totals vs. statutory limits, assessment-year selector, progress indicators.
-- **FR-5.3** *(v2)* Export: CSV/PDF summary per assessment year, organized to align with Form BE relief line items, for the user's own filing reference (not a submission artifact).
+- **FR-5.3** *(v2 — Not yet implemented)* Export: CSV/PDF summary per assessment year, organized to align with Form BE relief line items, for the user's own filing reference (not a submission artifact).
 
 ### FR-6: Multi-User Support *(v2)*
 - **FR-6.1** Multi-user auth with per-user data isolation.
@@ -128,20 +134,24 @@ users
   ├─ id, email, telegram_id, filing_profile (v2), created_at
 
 receipts
-  ├─ id, user_id, image_url, merchant, total_amount,
+  ├─ id, user_id, image_url, merchant, total_amount (immutable original),
+  │  claimed_amount (user-adjusted when items excluded; null = full total),
   │  transaction_date, assessment_year,
   │  spending_category, relief_category,
-  │  confidence_flag, status (pending_review / confirmed),
+  │  needs_review, possible_duplicate, duplicate_of_id,
+  │  status (pending_review / confirmed), auto_confirmed,
   │  rule_version_id, created_at
 
 receipt_line_items (v2)
   ├─ id, receipt_id, description, amount,
-  │  spending_category, relief_category, is_claimable
+  │  spending_category, relief_category, is_claimable,
+  │  include_in_records (boolean, default true)
 
 relief_rules
   ├─ id, assessment_year, rule_version, status (draft/active),
   │  category_key, category_label, limit_amount,
-  │  sub_cap_parent_id (nullable), source_reference, description
+  │  sub_cap_parent_id (nullable), enforces_combined_cap (boolean),
+  │  source_reference, description
 ```
 
 ---
@@ -214,7 +224,7 @@ relief_rules
 
 | Version | Focus | Key additions |
 |---|---|---|
-| **v1+v2 (merged)** | Personal build, v2-scope features | Telegram capture, dual-category extraction, expanded profile-filtered relief ceilings, line-item extraction, dashboard (both views), export, LLM-assisted rule drafting (draft mode), RLS enabled — all deployed for single-user use |
+| **v1+v2 (merged)** | Personal build, v2-scope features | Telegram capture, dual-category extraction, universal confirm flow, expanded profile-filtered relief ceilings, line-item extraction with exclusions & claimed_amount, dashboard (both views), WebP image compression, RLS enabled (Deployed: Web on Vercel, Bot on Railway). *Pending: Form BE Export (FR-5.3), LLM Rule Drafting (FR-4.4)* |
 | **v3** | Public-ready / portfolio | RAG for guideline Q&A, MyInvois read-only corroboration, PII pattern detection, scalability review, portfolio polish |
 
 ---
