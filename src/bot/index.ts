@@ -583,14 +583,17 @@ bot.callbackQuery(/^(?:y|year):(.+)$/, async (ctx) => {
     rules = draftRules || []
   }
 
+  const hasRules = rules && rules.length > 0
   let newRuleVersionId: string | null = null
-  const matchedRule = (rules || []).find((r) => r.category_key === receipt.relief_category)
-  if (matchedRule) {
-    newRuleVersionId = matchedRule.id
-  } else if (rules && rules.length > 0) {
-    const noneRule = rules.find((r) => r.category_key === 'none')
-    const fallbackRule = noneRule || rules[0]
-    newRuleVersionId = fallbackRule ? fallbackRule.id : null
+  if (hasRules) {
+    const matchedRule = rules.find((r) => r.category_key === receipt.relief_category)
+    if (matchedRule) {
+      newRuleVersionId = matchedRule.id
+    } else {
+      const noneRule = rules.find((r) => r.category_key === 'none')
+      const fallbackRule = noneRule || rules[0]
+      newRuleVersionId = fallbackRule ? fallbackRule.id : null
+    }
   }
 
   // Update DB with both assessment_year and rule_version_id
@@ -610,6 +613,11 @@ bot.callbackQuery(/^(?:y|year):(.+)$/, async (ctx) => {
 
   const states = toggleSessions.get(sessionKey)
 
+  const reviewReasons: string[] = []
+  if (!hasRules) {
+    reviewReasons.push(`⚠️ Tax relief rules for YA ${nextYear} have not been published yet. Claims will be calculated once rules are released.`)
+  }
+
   const card = buildConfirmCard({
     receiptId,
     merchant: receipt.merchant || 'Unknown',
@@ -618,15 +626,19 @@ bot.callbackQuery(/^(?:y|year):(.+)$/, async (ctx) => {
     assessmentYear: nextYear,
     spendCat: receipt.spending_category || 'other',
     reliefCat: receipt.relief_category || 'none',
-    needsReview: receipt.needs_review || false,
-    reviewReasons: [],
+    needsReview: (!hasRules) || (receipt.needs_review || false),
+    reviewReasons,
     isPossibleDuplicate: receipt.possible_duplicate || false,
     lineItems: (lineItems || []) as LineItem[],
     sessionKey,
     toggleStates: states,
   })
 
-  await ctx.answerCallbackQuery({ text: `Switched to YA ${nextYear}` })
+  const popupText = hasRules
+    ? `Switched to YA ${nextYear}`
+    : `Switched to YA ${nextYear} (Notice: YA ${nextYear} rules pending release)`
+
+  await ctx.answerCallbackQuery({ text: popupText })
   try {
     await ctx.editMessageText(card.text, { parse_mode: 'HTML', reply_markup: card.keyboard })
   } catch {}
