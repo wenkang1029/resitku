@@ -4,11 +4,9 @@ All notable changes and architectural decisions for **ResitKu** are documented h
 
 ---
 
-## 2026-08-24 — RPC `claimed_amount` Consolidation & Sidebar Assessment Year Selector
-- **`confirm_receipt_admin` RPC Consolidation (`009_confirm_receipt_rpc_claimed_amount.sql`):** Moved the `claimed_amount = SUM(amount WHERE include_in_records = true)` logic directly inside PostgreSQL. Guarantees 100% identical behavior across Web dashboard and Telegram bot confirm paths.
-- **Telegram Bot Cleanup (`src/bot/index.ts`):** Removed redundant TypeScript `claimed_amount` summation logic and now relies exclusively on the database RPC.
-- **Left Sidebar Assessment Year Selector (`src/components/dashboard/Navigation.tsx`):** Placed the interactive `<select>` dropdown inside the left desktop sidebar. Top bar (`DashboardHeader.tsx`) now displays a clean, static `YA <year>` indicator.
-- **Per-User Scoped Storage (`src/context/YearContext.tsx`):** Scoped localStorage key to `resitku_selected_ya_<userId>` to ensure strict isolation across different user sessions on shared devices.
+## 2026-08-24 — Pending Review RLS Session Fetch Fix
+- **Pending Review Page (`src/app/dashboard/pending/page.tsx`):** Fixed an issue where the pending count badge rendered on the sidebar (queried via SSR server client with user cookies), but the client-side pending page used an unauthenticated standalone client (`createClient`), causing PostgreSQL Row-Level Security (RLS) to return an empty array (`[]`). Routed the pending page fetch through the session-authenticated `GET /api/receipts?status=pending_review` endpoint.
+
 
 
 

@@ -18,10 +18,6 @@ import {
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
-
 function formatRM(amount: number): string {
   return `RM ${amount.toLocaleString('en-MY', {
     minimumFractionDigits: 2,
@@ -57,14 +53,14 @@ export default function PendingReviewPage() {
     setLoading(true)
     setErrorMessage(null)
     try {
-      const { data, error } = await supabase
-        .from('receipts')
-        .select('id, merchant, total_amount, transaction_date, spending_category, relief_category, image_url, needs_review, status, possible_duplicate, duplicate_of_id, created_at')
-        .eq('status', 'pending_review')
-        .order('created_at', { ascending: false })
+      const res = await fetch('/api/receipts?status=pending_review')
+      const json = await res.json()
 
-      if (error) throw error
-      setReceipts(data || [])
+      if (!res.ok || json.error) {
+        throw new Error(json.error || 'Failed to load pending receipts')
+      }
+
+      setReceipts(json.receipts || [])
     } catch (err: any) {
       console.error('Failed to load pending receipts:', err)
       setErrorMessage(err.message || 'Failed to load receipts. Please refresh.')
