@@ -4,8 +4,12 @@ All notable changes and architectural decisions for **ResitKu** are documented h
 
 ---
 
-## 2026-08-24 — Pending Review RLS Session Fetch Fix
-- **Pending Review Page (`src/app/dashboard/pending/page.tsx`):** Fixed an issue where the pending count badge rendered on the sidebar (queried via SSR server client with user cookies), but the client-side pending page used an unauthenticated standalone client (`createClient`), causing PostgreSQL Row-Level Security (RLS) to return an empty array (`[]`). Routed the pending page fetch through the session-authenticated `GET /api/receipts?status=pending_review` endpoint.
+## 2026-08-24 — Tax Profile Component Modularization
+- **Component Separation (`src/app/dashboard/profile/page.tsx`):** Refactored the 584-line monolithic profile page into two focused, isolated sub-components:
+  - `TelegramLinkCard.tsx` ([`src/components/dashboard/TelegramLinkCard.tsx`](file:///c:/Users/ASUS/Desktop/resitku/src/components/dashboard/TelegramLinkCard.tsx)): Manages Telegram pairing, 6-digit code generation, countdown timers, clipboard copying, and disconnect modal.
+  - `TaxReliefProfileForm.tsx` ([`src/components/dashboard/TaxReliefProfileForm.tsx`](file:///c:/Users/ASUS/Desktop/resitku/src/components/dashboard/TaxReliefProfileForm.tsx)): Manages filing status, joint/separate switches, personal and spouse OKU disability relief, and dynamic dependent children allowance forms.
+- **Page Container Simplification:** Reduced `page.tsx` from 584 lines to 65 lines with zero behavioral or styling regression.
+
 
 
 
