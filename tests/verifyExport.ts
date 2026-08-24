@@ -48,9 +48,11 @@ async function runVerification() {
   console.log(`Active categories: Dashboard (${activeDashboard.length}), Export (${activeExport.length})`)
   activeExport.forEach((c) => {
     console.log(` • [${c.category_key}] ${c.category_label_en}: Claimed RM ${c.claimed_effective.toFixed(2)} / Limit RM ${c.limit_amount}`)
-    c.items.forEach((item) => {
-      console.log(`    ↳ Item: ${item.description} (${item.merchant}) - RM ${item.amount.toFixed(2)}`)
-    })
+  })
+
+  console.log('\n--- All Contributing Items in Export ---')
+  exportData.all_contributing_items.forEach((item) => {
+    console.log(` • [${item.relief_category}] ${item.merchant} - ${item.description}: RM ${item.amount.toFixed(2)} (${item.transaction_date})`)
   })
 
   console.log('\n--- Generated CSV (First 20 lines) ---')
