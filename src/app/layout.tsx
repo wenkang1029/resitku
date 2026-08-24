@@ -5,6 +5,11 @@ import { Toaster } from "sonner";
 export const metadata: Metadata = {
   title: "ResitKu — Personal Expense & Tax Relief Tracker",
   description: "Track Malaysian personal expenses and tax relief allowances with ease.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "ResitKu",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

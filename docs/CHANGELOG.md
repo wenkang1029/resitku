@@ -4,6 +4,13 @@ All notable changes and architectural decisions for **ResitKu** are documented h
 
 ---
 
+## 2026-08-24 — PWA Webapp Branding & Home Screen Icons
+- **App Icons (`src/app/icon.png` & `src/app/apple-icon.png`):** Generated high-resolution 512x512 browser favicon and 180x180 Apple touch icon from the official ResitKu blue receipt logo.
+- **PWA Web Manifest (`src/app/manifest.ts`):** Implemented typed Next.js App Router manifest configuration with `standalone` display mode, matching palette (`#0052FF` theme color, `#FAFAFA` background), and 192x192 / 512x512 icons for Android / Chrome / iOS Add-to-Home-Screen workflows.
+- **Root Layout Metadata (`src/app/layout.tsx`):** Added `appleWebApp` configuration (`capable: true`, `statusBarStyle: 'default'`) for browser chrome-less mobile execution.
+
+---
+
 ## 2026-08-24 — Project Structure Clean-up & Unified Test Suite
 - **Orphan File Removal:** Deleted unused legacy files (`src/components/dashboard/BottomNav.tsx`, `scripts/run_date_tests.js`).
 - **Centralized Domain Types (`src/types/index.ts`):** Created barrel export exporting canonical interfaces (`Receipt`, `ReceiptLineItem`, `ReliefRule`, `FilingProfile`, `DateValidationResult`).
