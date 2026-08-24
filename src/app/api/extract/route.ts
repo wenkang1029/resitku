@@ -309,19 +309,21 @@ Guidelines:
     }
 
     // -------------------------------------------------------------
-    // Upload image to Supabase Storage bucket (receipts-images)
+    // Compress and Upload image to Supabase Storage (receipts-images)
     // -------------------------------------------------------------
     let storedImagePath: string | null = null
     if (imageBase64 && userId) {
       try {
-        const fileExt = mimeType.includes('png') ? 'png' : 'jpg'
-        const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`
-        const buffer = Buffer.from(imageBase64, 'base64')
+        const { compressReceiptImage } = await import('@/lib/extraction/compressImage')
+        const rawBuffer = Buffer.from(imageBase64, 'base64')
+        const compressed = await compressReceiptImage(rawBuffer, 2048, 88)
+
+        const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${compressed.extension}`
 
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('receipts-images')
-          .upload(fileName, buffer, {
-            contentType: mimeType,
+          .upload(fileName, compressed.buffer, {
+            contentType: compressed.contentType,
             upsert: true,
           })
 
@@ -329,10 +331,13 @@ Guidelines:
           console.error('[extract] Storage upload error:', JSON.stringify(uploadError))
         } else if (uploadData) {
           storedImagePath = uploadData.path
-          console.log('[extract] Successfully uploaded receipt image to:', storedImagePath)
+          console.log(
+            `[extract] Uploaded compressed WebP (${(compressed.compressedSizeBytes / 1024).toFixed(1)} KB, down from ${(compressed.originalSizeBytes / 1024).toFixed(1)} KB) to:`,
+            storedImagePath
+          )
         }
       } catch (storageErr) {
-        console.error('[extract] Error uploading image to storage:', storageErr)
+        console.error('[extract] Error compressing/uploading image to storage:', storageErr)
       }
     }
 

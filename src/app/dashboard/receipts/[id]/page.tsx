@@ -29,6 +29,30 @@ export default function ReceiptDetailPage() {
   const [duplicateOf, setDuplicateOf] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
+  const [updatingYear, setUpdatingYear] = useState(false)
+
+  async function handleYearChange(newYear: number) {
+    if (!receipt || receipt.assessment_year === newYear) return
+    setUpdatingYear(true)
+    try {
+      const res = await fetch(`/api/receipts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assessment_year: newYear }),
+      })
+      const data = await res.json()
+      if (res.ok && data.receipt) {
+        setReceipt(data.receipt)
+      } else {
+        alert(`Failed to update assessment year: ${data.error || 'Unknown error'}`)
+      }
+    } catch (err) {
+      console.error('Error updating assessment year:', err)
+      alert('Error updating assessment year.')
+    } finally {
+      setUpdatingYear(false)
+    }
+  }
 
   useEffect(() => {
     async function loadReceipt() {
@@ -213,7 +237,19 @@ export default function ReceiptDetailPage() {
                 </div>
                 <div>
                   <span className="text-[10px] text-[#64748B] block">Assessment Year</span>
-                  <span className="font-semibold text-[#0F172A] tabular-nums">YA {receipt.assessment_year || 2025}</span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <select
+                      value={receipt.assessment_year || 2025}
+                      onChange={(e) => handleYearChange(Number(e.target.value))}
+                      disabled={updatingYear}
+                      className="bg-[#F8FAFC] border border-[#CBD5E1] rounded-lg px-2 py-1 text-xs font-semibold text-[#0F172A] focus:outline-hidden focus:border-[#0052FF] disabled:opacity-50 cursor-pointer"
+                    >
+                      <option value={2024}>YA 2024</option>
+                      <option value={2025}>YA 2025</option>
+                      <option value={2026}>YA 2026</option>
+                    </select>
+                    {updatingYear && <span className="text-[10px] text-[#64748B] animate-pulse">Saving...</span>}
+                  </div>
                 </div>
                 <div className="col-span-2 pt-2 border-t border-[#F1F5F9]">
                   <span className="text-[10px] text-[#64748B] block">Tax Relief Category</span>

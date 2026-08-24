@@ -75,6 +75,7 @@ interface ConfirmCardOptions {
   merchant: string
   total: number
   date: string
+  assessmentYear?: number
   spendCat: string
   reliefCat: string
   needsReview: boolean
@@ -87,13 +88,14 @@ interface ConfirmCardOptions {
 
 function buildConfirmCard(opts: ConfirmCardOptions): { text: string; keyboard: InlineKeyboard } {
   const {
-    receiptId, merchant, total, date, spendCat, reliefCat,
+    receiptId, merchant, total, date, assessmentYear = 2025, spendCat, reliefCat,
     needsReview, reviewReasons, isPossibleDuplicate, lineItems,
     sessionKey, toggleStates,
   } = opts
 
   const m = escapeHtml(merchant)
   const d = escapeHtml(date)
+  const ya = assessmentYear
   const sc = escapeHtml(spendCat)
   const rc = reliefCat === 'none' ? 'None (Not claimable)' : escapeHtml(reliefCat)
 
@@ -123,11 +125,14 @@ function buildConfirmCard(opts: ConfirmCardOptions): { text: string; keyboard: I
         `🏪 <b>Merchant:</b> ${m}\n` +
         `💰 <b>Total:</b> RM ${total.toFixed(2)}\n` +
         `📅 <b>Date:</b> ${d}\n` +
+        `🗓️ <b>Tax Year:</b> YA ${ya}\n` +
         `🏷️ <b>Category:</b> ${sc}\n` +
         `🏛️ <b>Tax Relief:</b> ${rc}` +
         reviewBlock
 
       keyboard
+        .text(`🗓️ YA ${ya}`, `y:${receiptId}`)
+        .row()
         .text('✅ Confirm', `c:${receiptId}`)
         .text('✏️ Edit Details', `e:${receiptId}`)
 
@@ -152,6 +157,7 @@ function buildConfirmCard(opts: ConfirmCardOptions): { text: string; keyboard: I
       `🏪 <b>Merchant:</b> ${m}\n` +
       `💰 <b>Total:</b> RM ${total.toFixed(2)}\n` +
       `📅 <b>Date:</b> ${d}\n` +
+      `🗓️ <b>Tax Year:</b> YA ${ya}\n` +
       `🏷️ <b>Category:</b> ${sc}\n` +
       `🏛️ <b>Tax Relief:</b> ${rc}\n\n` +
       `<b>Line Items</b> (tap to toggle inclusion):\n${itemLines}\n\n` +
@@ -168,6 +174,8 @@ function buildConfirmCard(opts: ConfirmCardOptions): { text: string; keyboard: I
     })
 
     keyboard.row()
+      .text(`🗓️ YA ${ya}`, `y:${receiptId}`)
+      .row()
       .text('✅ Confirm', `c:${receiptId}`)
       .text('✏️ Edit Details', `e:${receiptId}`)
 
@@ -180,6 +188,7 @@ function buildConfirmCard(opts: ConfirmCardOptions): { text: string; keyboard: I
     `🏪 <b>Merchant:</b> ${m}\n` +
     `💰 <b>Total:</b> RM ${total.toFixed(2)}\n` +
     `📅 <b>Date:</b> ${d}\n` +
+    `🗓️ <b>Tax Year:</b> YA ${ya}\n` +
     `🏷️ <b>Category:</b> ${sc}\n` +
     `🏛️ <b>Tax Relief:</b> ${rc}\n\n` +
     `📦 <b>${lineItems.length} line items</b> — too many to toggle here.\n` +
@@ -187,6 +196,8 @@ function buildConfirmCard(opts: ConfirmCardOptions): { text: string; keyboard: I
     reviewBlock
 
   keyboard
+    .text(`🗓️ YA ${ya}`, `y:${receiptId}`)
+    .row()
     .text('✅ Confirm All', `c:${receiptId}`)
     .text('🌐 Review on Web', `w:${receiptId}`)
 
@@ -300,7 +311,7 @@ bot.command('pending', async (ctx) => {
 
   const { data: pendingReceipts } = await supabase
     .from('receipts')
-    .select('id, merchant, total_amount, transaction_date, needs_review, possible_duplicate, spending_category, relief_category')
+    .select('id, merchant, total_amount, transaction_date, assessment_year, needs_review, possible_duplicate, spending_category, relief_category')
     .eq('user_id', userRow.id)
     .eq('status', 'pending_review')
     .order('created_at', { ascending: true })
@@ -320,6 +331,7 @@ bot.command('pending', async (ctx) => {
     merchant: r.merchant || 'Unknown',
     total: Number(r.total_amount || 0),
     date: r.transaction_date || 'Unknown',
+    assessmentYear: r.assessment_year || 2025,
     spendCat: r.spending_category || 'other',
     reliefCat: r.relief_category || 'none',
     needsReview: r.needs_review,
@@ -418,6 +430,7 @@ bot.on('message:photo', async (ctx) => {
       merchant: llm.merchant || 'Unknown',
       total: Number(llm.total_amount || 0),
       date: llm.transaction_date || 'Unknown',
+      assessmentYear: receipt?.assessment_year || 2025,
       spendCat: llm.spending_category || 'other',
       reliefCat: llm.relief_category || 'none',
       needsReview: data.needs_review || false,
@@ -506,7 +519,7 @@ bot.callbackQuery(/^(?:t|toggle):([^:]+):(.+)$/, async (ctx) => {
   // Fetch receipt data to rebuild card
   const { data: receipt } = await supabase
     .from('receipts')
-    .select('id, merchant, total_amount, transaction_date, spending_category, relief_category, needs_review, possible_duplicate')
+    .select('id, merchant, total_amount, transaction_date, assessment_year, spending_category, relief_category, needs_review, possible_duplicate')
     .eq('id', receiptId).single()
 
   if (!receipt) { await ctx.answerCallbackQuery({ text: 'Receipt not found.' }); return }
@@ -516,6 +529,7 @@ bot.callbackQuery(/^(?:t|toggle):([^:]+):(.+)$/, async (ctx) => {
     merchant: receipt.merchant || 'Unknown',
     total: Number(receipt.total_amount || 0),
     date: receipt.transaction_date || 'Unknown',
+    assessmentYear: receipt.assessment_year || 2025,
     spendCat: receipt.spending_category || 'other',
     reliefCat: receipt.relief_category || 'none',
     needsReview: receipt.needs_review || false,
@@ -527,6 +541,92 @@ bot.callbackQuery(/^(?:t|toggle):([^:]+):(.+)$/, async (ctx) => {
   })
 
   await ctx.answerCallbackQuery()
+  try {
+    await ctx.editMessageText(card.text, { parse_mode: 'HTML', reply_markup: card.keyboard })
+  } catch {}
+})
+
+// Cycle Assessment Year button: matches `y:<receiptId>`
+bot.callbackQuery(/^(?:y|year):(.+)$/, async (ctx) => {
+  const receiptId = ctx.match[1]
+  const msgId = ctx.callbackQuery.message?.message_id
+  const chatId = ctx.chat?.id
+  if (!msgId || !chatId) { await ctx.answerCallbackQuery(); return }
+
+  const sessionKey = `${chatId}:${msgId}`
+
+  // Fetch current receipt
+  const { data: receipt } = await supabase
+    .from('receipts')
+    .select('id, merchant, total_amount, transaction_date, assessment_year, spending_category, relief_category, needs_review, possible_duplicate')
+    .eq('id', receiptId).single()
+
+  if (!receipt) { await ctx.answerCallbackQuery({ text: 'Receipt not found.' }); return }
+
+  // Cycle year: 2025 -> 2026 -> 2024 -> 2025
+  const currentYear = receipt.assessment_year || 2025
+  const nextYear = currentYear === 2025 ? 2026 : currentYear === 2026 ? 2024 : 2025
+
+  // Fetch corresponding rule_version_id for target nextYear
+  let { data: rules } = await supabase
+    .from('relief_rules')
+    .select('id, category_key, rule_version, status')
+    .eq('assessment_year', nextYear)
+    .eq('status', 'active')
+
+  if (!rules || rules.length === 0) {
+    const { data: draftRules } = await supabase
+      .from('relief_rules')
+      .select('id, category_key, rule_version, status')
+      .eq('assessment_year', nextYear)
+      .eq('status', 'draft')
+    rules = draftRules || []
+  }
+
+  let newRuleVersionId: string | null = null
+  const matchedRule = (rules || []).find((r) => r.category_key === receipt.relief_category)
+  if (matchedRule) {
+    newRuleVersionId = matchedRule.id
+  } else if (rules && rules.length > 0) {
+    const noneRule = rules.find((r) => r.category_key === 'none')
+    const fallbackRule = noneRule || rules[0]
+    newRuleVersionId = fallbackRule ? fallbackRule.id : null
+  }
+
+  // Update DB with both assessment_year and rule_version_id
+  await supabase
+    .from('receipts')
+    .update({
+      assessment_year: nextYear,
+      rule_version_id: newRuleVersionId,
+    })
+    .eq('id', receiptId)
+
+  // Fetch line items
+  const { data: lineItems } = await supabase
+    .from('receipt_line_items')
+    .select('id, description, amount, is_claimable, include_in_records')
+    .eq('receipt_id', receiptId)
+
+  const states = toggleSessions.get(sessionKey)
+
+  const card = buildConfirmCard({
+    receiptId,
+    merchant: receipt.merchant || 'Unknown',
+    total: Number(receipt.total_amount || 0),
+    date: receipt.transaction_date || 'Unknown',
+    assessmentYear: nextYear,
+    spendCat: receipt.spending_category || 'other',
+    reliefCat: receipt.relief_category || 'none',
+    needsReview: receipt.needs_review || false,
+    reviewReasons: [],
+    isPossibleDuplicate: receipt.possible_duplicate || false,
+    lineItems: (lineItems || []) as LineItem[],
+    sessionKey,
+    toggleStates: states,
+  })
+
+  await ctx.answerCallbackQuery({ text: `Switched to YA ${nextYear}` })
   try {
     await ctx.editMessageText(card.text, { parse_mode: 'HTML', reply_markup: card.keyboard })
   } catch {}
