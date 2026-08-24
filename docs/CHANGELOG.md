@@ -10,13 +10,53 @@ All notable changes and architectural decisions for **ResitKu** are documented h
   - `TaxReliefProfileForm.tsx` ([`src/components/dashboard/TaxReliefProfileForm.tsx`](file:///c:/Users/ASUS/Desktop/resitku/src/components/dashboard/TaxReliefProfileForm.tsx)): Manages filing status, joint/separate switches, personal and spouse OKU disability relief, and dynamic dependent children allowance forms.
 - **Page Container Simplification:** Reduced `page.tsx` from 584 lines to 65 lines with zero behavioral or styling regression.
 
+---
 
+## 2026-08-24 — Pending Review RLS Session Fetch Fix
+- **Pending Review Page (`src/app/dashboard/pending/page.tsx`):** Fixed an issue where the pending count badge rendered on the sidebar (queried via SSR server client with user cookies), but the client-side pending page used an unauthenticated standalone client (`createClient`), causing PostgreSQL Row-Level Security (RLS) to return an empty array (`[]`). Routed the pending page fetch through the session-authenticated `GET /api/receipts?status=pending_review` endpoint.
 
+---
 
+## 2026-08-24 — RPC `claimed_amount` Consolidation & Responsive Assessment Year Navigation
+- **`confirm_receipt_admin` RPC Consolidation (`009_confirm_receipt_rpc_claimed_amount.sql`):** Moved the `claimed_amount = SUM(amount WHERE include_in_records = true)` calculation logic directly inside PostgreSQL. Guarantees 100% identical behavior across Web dashboard (`/api/receipts/confirm`) and Telegram bot confirm paths.
+- **Telegram Bot Cleanup (`src/bot/index.ts`):** Removed redundant TypeScript `claimed_amount` summation logic and now relies exclusively on the database RPC.
+- **Left Sidebar Assessment Year Selector (`src/components/dashboard/Navigation.tsx`):** Placed the interactive `<select>` dropdown inside the left desktop sidebar header alongside the logo. Top bar (`DashboardHeader.tsx`) now displays a clean, static `YA <year>` indicator on desktop.
+- **Mobile Assessment Year Dropdown (`src/components/dashboard/DashboardHeader.tsx`):** Ensured the interactive year dropdown renders in the top sticky header on mobile screens (`<1024px`) where the sidebar is hidden.
+- **Per-User Scoped Storage (`src/context/YearContext.tsx`):** Scoped localStorage key to `resitku_selected_ya_<userId>` to ensure strict isolation across different user sessions on shared devices.
 
+---
 
+## 2026-08-24 — Global Assessment Year Sync & Navbar Centralization
+- **Global Assessment Year Context (`src/context/YearContext.tsx`):** Created `YearProvider` with persistent `localStorage` support (`resitku_selected_ya`) syncing the selected Assessment Year (`2026`, `2025`, `2024`) across the entire web application.
+- **Removed Duplicate In-Page Year Selectors:** Removed redundant in-page year cycle buttons from `/dashboard/expenses` and `/dashboard/relief`, replacing them with clear static `YA <year>` badges while delegating all year switching strictly to the navigation.
 
+---
 
+## 2026-08-24 — UX Modernization: Toast Notifications & Confirmation Modals
+- **Replaced `alert()` & `window.confirm()`:** Replaced all raw browser popups with Apple-styled UI elements:
+  - Installed `sonner` toast provider in root layout (`src/app/layout.tsx`) for non-blocking success/error feedback (3.5s auto-dismiss).
+  - Created reusable `ConfirmDialog.tsx` modal for destructive actions (receipt deletion, Telegram unlinking).
+- **Telegram Bot Friendly Guidance:** Wrapped raw technical LLM extraction errors in a plain-English, elderly-friendly retry tip prompt.
+
+---
+
+## 2026-08-24 — Dynamic Assessment Year Fallback Fix
+- **Extraction Route Correctness Fix (`src/app/api/extract/route.ts`):** Replaced hardcoded `const targetYear = 2026` with dynamic `const targetYear = new Date().getFullYear()`. Eliminates the risk of undated receipts being misattributed to 2026 when future calendar years (2027+) begin.
+
+---
+
+## 2026-08-24 — Security Audit & Link Code Logging
+- **Security Audit Passed:** Re-verified Postgres Row-Level Security (RLS) across all 5 tables (`receipts`, `receipt_line_items`, `users`, `relief_rules`, `link_codes`). Confirmed strict `auth.uid()` scoping with zero client-side `SUPABASE_SERVICE_ROLE_KEY` leaks.
+- **Link Code Security Logging (`src/bot/index.ts`):** Added structured `console.warn` audit alerts on any failed `/link` attempt (recording the invalid/used/expired code, `telegramId`, and Telegram `username`) to ensure full operational visibility against brute-force probing.
+- **Backlog Hardening Note (Pre-v3 expansion):** Before opening to public / multi-tenant signups beyond personal/family use, implement an IP / Telegram-ID sliding-window rate limiter (e.g. 5 attempts per 10 minutes) and an authenticated quota throttle on `/api/extract`.
+
+---
+
+## 2026-08-24 — Phase 8: Form BE Tax Relief Export (CSV & Print / PDF)
+- **Single Calculation Source of Truth (`exportRelief.ts`):** Built canonical exporter directly wrapping `calculateReliefProgress` from `calculateRelief.ts`. Ensures 100% mathematical parity across CSV download, Print / PDF view, and live dashboard.
+- **Form BE Export API (`GET /api/export`):** Supports `?format=csv` for direct Form BE structured CSV download and `?format=json` for print rendering. Correctly respects `include_in_records: false` and groups umbrella caps (e.g. `medical_combined_umbrella`) alongside their sub-caps.
+- **Dedicated Print / PDF Page (`/dashboard/relief/print`):** Clean, professional Form BE reference document with `@media print` rules, A4 page breaks, and one-click browser print / PDF saving.
+- **Tax Relief Dashboard Export Card:** Added action card on `/dashboard/relief` with instant CSV download and Print / Save PDF navigation, alongside a clear legal disclaimer.
 
 ---
 
