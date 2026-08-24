@@ -4,10 +4,9 @@ All notable changes and architectural decisions for **ResitKu** are documented h
 
 ---
 
-## 2026-08-24 — Security Audit & Link Code Logging
-- **Security Audit Passed:** Re-verified Postgres Row-Level Security (RLS) across all 5 tables (`receipts`, `receipt_line_items`, `users`, `relief_rules`, `link_codes`). Confirmed strict `auth.uid()` scoping with zero client-side `SUPABASE_SERVICE_ROLE_KEY` leaks.
-- **Link Code Security Logging (`src/bot/index.ts`):** Added structured `console.warn` audit alerts on any failed `/link` attempt (recording the invalid/used/expired code, `telegramId`, and Telegram `username`) to ensure full operational visibility against brute-force probing.
-- **Backlog Hardening Note (Pre-v3 expansion):** Before opening to public / multi-tenant signups beyond personal/family use, implement an IP / Telegram-ID sliding-window rate limiter (e.g. 5 attempts per 10 minutes) and an authenticated quota throttle on `/api/extract`.
+## 2026-08-24 — Dynamic Assessment Year Fallback Fix
+- **Extraction Route Correctness Fix (`src/app/api/extract/route.ts`):** Replaced hardcoded `const targetYear = 2026` with dynamic `const targetYear = new Date().getFullYear()`. Eliminates the risk of undated receipts being misattributed to 2026 when future calendar years (2027+) begin.
+
 
 
 

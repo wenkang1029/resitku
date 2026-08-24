@@ -81,8 +81,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized: User not authenticated or user_id not provided' }, { status: 401 })
     }
 
-    // 2 & 3. Fetch relief rules for assessment_year (default 2026/2025)
-    const targetYear = 2026
+    // 2 & 3. Fetch relief rules for assessment_year (dynamically defaults to current calendar year)
+    const currentCalendarYear = new Date().getFullYear()
+    const targetYear = currentCalendarYear
     let { data: rules } = await supabase
       .from('relief_rules')
       .select('id, category_key, category_label, limit_amount, description, rule_version, status')
