@@ -431,8 +431,18 @@ bot.on('message:photo', async (ctx) => {
     }
 
     if (!data.success && data.error) {
-      await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id,
-        `❌ <b>Extraction Error:</b> ${escapeHtml(data.error)}`, { parse_mode: 'HTML' })
+      await ctx.api.editMessageText(
+        ctx.chat.id,
+        statusMsg.message_id,
+        `⚠️ <b>Unable to Read Receipt</b>\n\n` +
+        `We had trouble extracting information from this photo.\n\n` +
+        `📸 <i>Tips for best results:</i>\n` +
+        `• Ensure good lighting without shadows or glare\n` +
+        `• Flatten the receipt on a dark background\n` +
+        `• Keep store name, date, and total amount clearly visible\n\n` +
+        `Please try sending a clearer photo!`,
+        { parse_mode: 'HTML' }
+      )
       return
     }
 

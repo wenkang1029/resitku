@@ -15,6 +15,8 @@ import {
   Trash2,
   ExternalLink,
 } from 'lucide-react'
+import { toast } from 'sonner'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -47,35 +49,37 @@ export default function PendingReviewPage() {
   const [loading, setLoading] = useState(true)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const router = useRouter()
 
-  const loadPending = useCallback(async () => {
+  const fetchPendingReceipts = useCallback(async () => {
     setLoading(true)
     setErrorMessage(null)
     try {
-      const res = await fetch('/api/receipts?status=pending_review')
-      const json = await res.json()
-      if (!res.ok || json.error) {
-        throw new Error(json.error || 'Failed to fetch pending receipts')
-      }
-      setReceipts(json.receipts || [])
+      const { data, error } = await supabase
+        .from('receipts')
+        .select('id, merchant, total_amount, transaction_date, spending_category, relief_category, image_url, needs_review, status, possible_duplicate, duplicate_of_id, created_at')
+        .eq('status', 'pending_review')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setReceipts(data || [])
     } catch (err: any) {
-      console.error('Error fetching pending receipts:', err)
-      setErrorMessage(err.message || 'Error fetching pending receipts')
+      console.error('Failed to load pending receipts:', err)
+      setErrorMessage(err.message || 'Failed to load receipts. Please refresh.')
+      toast.error('Failed to load pending receipts')
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    loadPending()
-  }, [loadPending])
+    fetchPendingReceipts()
+  }, [fetchPendingReceipts])
 
   async function handleConfirm(id: string) {
     setUpdatingId(id)
-    setErrorMessage(null)
-
     try {
       const res = await fetch('/api/receipts/confirm', {
         method: 'POST',
@@ -89,18 +93,19 @@ export default function PendingReviewPage() {
       }
 
       setReceipts((prev) => prev.filter((r) => r.id !== id))
+      toast.success('Receipt confirmed and added to your records')
       router.refresh()
     } catch (err: any) {
       console.error('Failed to confirm receipt:', err)
-      setErrorMessage(err.message || 'Failed to confirm receipt. Please try again.')
+      toast.error(err.message || 'Failed to confirm receipt')
     } finally {
       setUpdatingId(null)
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!window.confirm('Delete this pending receipt?')) return
-
+  async function executeDelete() {
+    if (!deleteTargetId) return
+    const id = deleteTargetId
     setDeletingId(id)
     try {
       const res = await fetch('/api/receipts/delete', {
@@ -111,15 +116,17 @@ export default function PendingReviewPage() {
 
       if (res.ok) {
         setReceipts((prev) => prev.filter((r) => r.id !== id))
+        toast.success('Pending receipt deleted')
         router.refresh()
       } else {
-        alert('Failed to delete receipt.')
+        toast.error('Failed to delete receipt')
       }
     } catch (err) {
       console.error(err)
-      alert('Error deleting receipt.')
+      toast.error('Error deleting receipt')
     } finally {
       setDeletingId(null)
+      setDeleteTargetId(null)
     }
   }
 
@@ -241,9 +248,9 @@ export default function PendingReviewPage() {
                     </button>
 
                     <button
-                      onClick={() => handleDelete(r.id)}
+                      onClick={() => setDeleteTargetId(r.id)}
                       disabled={deletingId === r.id || updatingId === r.id}
-                      className="text-[#EF4444] bg-[#FEE2E2] hover:bg-[#FCA5A5] px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center min-h-[44px] transition-colors disabled:opacity-50"
+                      className="bg-[#FEE2E2] text-[#EF4444] text-xs font-semibold py-2.5 px-3 rounded-xl min-h-[44px] flex items-center justify-center gap-1 active:bg-[#FCA5A5] transition-colors disabled:opacity-50"
                       title="Delete receipt"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -254,6 +261,18 @@ export default function PendingReviewPage() {
             </div>
           )}
         </div>
+
+        {/* Delete Confirmation Modal */}
+        <ConfirmDialog
+          isOpen={Boolean(deleteTargetId)}
+          title="Delete Pending Receipt"
+          description="Are you sure you want to delete this pending receipt? It will be permanently removed."
+          confirmLabel="Delete"
+          isDestructive={true}
+          isLoading={Boolean(deletingId)}
+          onConfirm={executeDelete}
+          onCancel={() => setDeleteTargetId(null)}
+        />
       </main>
     </>
   )

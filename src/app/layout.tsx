@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "ResitKu — Personal Expense & Tax Relief Tracker",
@@ -11,7 +12,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col font-sans selection:bg-[#0052FF]/10 selection:text-[#0052FF]">
         {children}
+        <Toaster position="bottom-right" richColors closeButton duration={3500} />
       </body>
     </html>
   );
 }
+

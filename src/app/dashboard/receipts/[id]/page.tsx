@@ -13,6 +13,9 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 
+import { toast } from 'sonner'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+
 function formatRM(amount: number): string {
   return `RM ${amount.toLocaleString('en-MY', {
     minimumFractionDigits: 2,
@@ -30,6 +33,7 @@ export default function ReceiptDetailPage() {
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
   const [updatingYear, setUpdatingYear] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   async function handleYearChange(newYear: number) {
     if (!receipt || receipt.assessment_year === newYear) return
@@ -43,12 +47,13 @@ export default function ReceiptDetailPage() {
       const data = await res.json()
       if (res.ok && data.receipt) {
         setReceipt(data.receipt)
+        toast.success(`Assessment year updated to YA ${newYear}`)
       } else {
-        alert(`Failed to update assessment year: ${data.error || 'Unknown error'}`)
+        toast.error(data.error || 'Failed to update assessment year')
       }
     } catch (err) {
       console.error('Error updating assessment year:', err)
-      alert('Error updating assessment year.')
+      toast.error('Network error updating assessment year')
     } finally {
       setUpdatingYear(false)
     }
@@ -81,11 +86,7 @@ export default function ReceiptDetailPage() {
     loadReceipt()
   }, [id])
 
-  async function handleDelete() {
-    if (!window.confirm('Are you sure you want to delete this receipt? This action cannot be undone.')) {
-      return
-    }
-
+  async function executeDelete() {
     setDeleting(true)
     try {
       const res = await fetch('/api/receipts/delete', {
@@ -95,15 +96,17 @@ export default function ReceiptDetailPage() {
       })
 
       if (res.ok) {
+        toast.success('Receipt deleted successfully')
         router.push('/dashboard/expenses')
       } else {
-        alert('Failed to delete receipt.')
+        toast.error('Failed to delete receipt')
       }
     } catch (err) {
       console.error(err)
-      alert('Error deleting receipt.')
+      toast.error('Error deleting receipt')
     } finally {
       setDeleting(false)
+      setShowDeleteModal(false)
     }
   }
 
@@ -145,7 +148,7 @@ export default function ReceiptDetailPage() {
           </Link>
 
           <button
-            onClick={handleDelete}
+            onClick={() => setShowDeleteModal(true)}
             disabled={deleting}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#EF4444] bg-[#FEE2E2] hover:bg-[#FCA5A5] px-3 py-1.5 rounded-xl transition-colors disabled:opacity-50 min-h-[36px]"
           >
@@ -153,6 +156,18 @@ export default function ReceiptDetailPage() {
             {deleting ? 'Deleting...' : 'Delete Receipt'}
           </button>
         </div>
+
+        {/* Delete Confirmation Modal */}
+        <ConfirmDialog
+          isOpen={showDeleteModal}
+          title="Delete Receipt"
+          description="Are you sure you want to delete this receipt? This will permanently remove its line items and records."
+          confirmLabel="Delete"
+          isDestructive={true}
+          isLoading={deleting}
+          onConfirm={executeDelete}
+          onCancel={() => setShowDeleteModal(false)}
+        />
 
         {/* Duplicate Soft Warning Badge if applicable */}
         {receipt.possible_duplicate && (

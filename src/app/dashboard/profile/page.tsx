@@ -24,6 +24,8 @@ import {
   Clock,
   ExternalLink,
 } from 'lucide-react'
+import { toast } from 'sonner'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 
 export default function TaxProfilePage() {
   const router = useRouter()
@@ -45,6 +47,7 @@ export default function TaxProfilePage() {
   const [secondsRemaining, setSecondsRemaining] = useState<number>(0)
   const [generatingCode, setGeneratingCode] = useState(false)
   const [unlinking, setUnlinking] = useState(false)
+  const [showUnlinkModal, setShowUnlinkModal] = useState(false)
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
@@ -104,22 +107,19 @@ export default function TaxProfilePage() {
         const exp = new Date(data.expires_at)
         setCodeExpiresAt(exp)
         setSecondsRemaining(Math.max(0, Math.floor((exp.getTime() - Date.now()) / 1000)))
+        toast.success('Generated 6-digit link code')
       } else {
-        alert(data.error || 'Failed to generate link code.')
+        toast.error(data.error || 'Failed to generate link code.')
       }
     } catch (err) {
       console.error('Error generating link code:', err)
-      alert('Failed to generate link code.')
+      toast.error('Network error generating link code.')
     } finally {
       setGeneratingCode(false)
     }
   }
 
-  const unlinkTelegram = async () => {
-    if (!window.confirm('Are you sure you want to disconnect your Telegram account from this dashboard?')) {
-      return
-    }
-
+  const executeUnlink = async () => {
     setUnlinking(true)
     try {
       const res = await fetch('/api/telegram/unlink', { method: 'POST' })
@@ -128,14 +128,16 @@ export default function TaxProfilePage() {
       if (res.ok) {
         setTelegramId(null)
         setLinkCode(null)
+        toast.success('Telegram account disconnected')
       } else {
-        alert(data.error || 'Failed to unlink Telegram.')
+        toast.error(data.error || 'Failed to unlink Telegram.')
       }
     } catch (err) {
       console.error('Error unlinking Telegram:', err)
-      alert('Failed to unlink Telegram.')
+      toast.error('Network error unlinking Telegram.')
     } finally {
       setUnlinking(false)
+      setShowUnlinkModal(false)
     }
   }
 
@@ -189,15 +191,16 @@ export default function TaxProfilePage() {
 
       if (res.ok) {
         setSavedSuccess(true)
+        toast.success('Tax profile updated successfully')
         setTimeout(() => {
           router.push('/dashboard/relief')
         }, 1000)
       } else {
-        alert('Failed to save profile.')
+        toast.error('Failed to save tax profile.')
       }
     } catch (err) {
       console.error('Error saving profile:', err)
-      alert('Error saving profile.')
+      toast.error('Error saving profile.')
     } finally {
       setSaving(false)
     }
@@ -253,9 +256,9 @@ export default function TaxProfilePage() {
 
               <button
                 type="button"
-                onClick={unlinkTelegram}
+                onClick={() => setShowUnlinkModal(true)}
                 disabled={unlinking}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#EF4444] bg-[#FEE2E2] hover:bg-[#FCA5A5] px-3 py-1.5 rounded-xl transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#EF4444] bg-[#FEE2E2] hover:bg-[#FCA5A5] px-3 py-1.5 rounded-xl transition-colors disabled:opacity-50 min-h-[36px]"
               >
                 <Unlink className="w-3.5 h-3.5" />
                 {unlinking ? 'Disconnecting...' : 'Unlink Telegram'}
@@ -562,6 +565,18 @@ export default function TaxProfilePage() {
             </div>
           </form>
         </div>
+
+        {/* Telegram Unlink Modal */}
+        <ConfirmDialog
+          isOpen={showUnlinkModal}
+          title="Disconnect Telegram Account"
+          description="Are you sure you want to disconnect your Telegram account? You will need to generate a new 6-digit code to pair again."
+          confirmLabel="Disconnect"
+          isDestructive={true}
+          isLoading={unlinking}
+          onConfirm={executeUnlink}
+          onCancel={() => setShowUnlinkModal(false)}
+        />
       </main>
     </>
   )
