@@ -4,11 +4,11 @@ All notable changes and architectural decisions for **ResitKu** are documented h
 
 ---
 
-## 2026-08-24 — Phase 8: Form BE Tax Relief Export (CSV & Print / PDF)
-- **Single Calculation Source of Truth (`exportRelief.ts`):** Built canonical exporter directly wrapping `calculateReliefProgress` from `calculateRelief.ts`. Ensures 100% mathematical parity across CSV download, Print / PDF view, and live dashboard.
-- **Form BE Export API (`GET /api/export`):** Supports `?format=csv` for direct Form BE structured CSV download and `?format=json` for print rendering. Correctly respects `include_in_records: false` and groups umbrella caps (e.g. `medical_combined_umbrella`) alongside their sub-caps.
-- **Dedicated Print / PDF Page (`/dashboard/relief/print`):** Clean, professional Form BE reference document with `@media print` rules, A4 page breaks, and one-click browser print / PDF saving.
-- **Tax Relief Dashboard Export Card:** Added action card on `/dashboard/relief` with instant CSV download and Print / Save PDF navigation, alongside a clear legal disclaimer.
+## 2026-08-24 — Security Audit & Link Code Logging
+- **Security Audit Passed:** Re-verified Postgres Row-Level Security (RLS) across all 5 tables (`receipts`, `receipt_line_items`, `users`, `relief_rules`, `link_codes`). Confirmed strict `auth.uid()` scoping with zero client-side `SUPABASE_SERVICE_ROLE_KEY` leaks.
+- **Link Code Security Logging (`src/bot/index.ts`):** Added structured `console.warn` audit alerts on any failed `/link` attempt (recording the invalid/used/expired code, `telegramId`, and Telegram `username`) to ensure full operational visibility against brute-force probing.
+- **Backlog Hardening Note (Pre-v3 expansion):** Before opening to public / multi-tenant signups beyond personal/family use, implement an IP / Telegram-ID sliding-window rate limiter (e.g. 5 attempts per 10 minutes) and an authenticated quota throttle on `/api/extract`.
+
 
 
 

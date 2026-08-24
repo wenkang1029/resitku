@@ -257,22 +257,37 @@ bot.command('link', async (ctx) => {
     const { data: existingLinkedUser } = await supabase
       .from('users').select('id, email').eq('telegram_id', telegramId).single()
 
+    const username = ctx.from?.username ? `@${ctx.from.username}` : 'none'
+    const userDisplay = `${ctx.from?.first_name || ''} ${ctx.from?.last_name || ''}`.trim() || 'Unknown'
+
     const { data: codeRecord, error: codeErr } = await supabase
       .from('link_codes').select('id, code, user_id, expires_at, used').eq('code', rawCode).single()
 
     if (codeErr || !codeRecord) {
+      console.warn(
+        `[SECURITY AUDIT] Failed /link attempt (code not found): code="${rawCode}", telegramId=${telegramId}, username=${username}, name="${userDisplay}"`
+      )
       await ctx.reply(`❌ <b>Invalid Link Code</b>\n\nCode <code>${rawCode}</code> not found. Generate a new one on your dashboard.`, { parse_mode: 'HTML' })
       return
     }
     if (codeRecord.used) {
+      console.warn(
+        `[SECURITY AUDIT] Failed /link attempt (code already used): code="${rawCode}", telegramId=${telegramId}, username=${username}, targetUserId=${codeRecord.user_id}`
+      )
       await ctx.reply(`❌ <b>Code Already Used</b>\n\nGenerate a new code on your dashboard.`, { parse_mode: 'HTML' })
       return
     }
     if (new Date(codeRecord.expires_at).getTime() < Date.now()) {
+      console.warn(
+        `[SECURITY AUDIT] Failed /link attempt (code expired): code="${rawCode}", telegramId=${telegramId}, username=${username}, expiredAt=${codeRecord.expires_at}`
+      )
       await ctx.reply(`⏳ <b>Code Expired</b>\n\nGenerate a new code (valid 10 min) on your dashboard.`, { parse_mode: 'HTML' })
       return
     }
     if (existingLinkedUser && existingLinkedUser.id !== codeRecord.user_id) {
+      console.warn(
+        `[SECURITY AUDIT] Failed /link attempt (account conflict): telegramId=${telegramId}, currentlyLinkedTo=${existingLinkedUser.id}, targetUserId=${codeRecord.user_id}`
+      )
       await ctx.reply(
         `⚠️ <b>Account Conflict</b>\n\nThis Telegram is already linked to <b>${existingLinkedUser.email || 'another account'}</b>.\nUnlink first from the web dashboard.`,
         { parse_mode: 'HTML' }
@@ -284,9 +299,14 @@ bot.command('link', async (ctx) => {
     const { error: updateErr } = await supabase.from('users').update({ telegram_id: telegramId }).eq('id', codeRecord.user_id)
 
     if (updateErr) {
+      console.error(`[SECURITY AUDIT] Failed to link account in database:`, updateErr)
       await ctx.reply(`❌ Failed to link account: ${updateErr.message}`)
       return
     }
+
+    console.log(
+      `[SECURITY AUDIT] Successful /link pairing: userId=${codeRecord.user_id}, telegramId=${telegramId}, username=${username}`
+    )
 
     await ctx.reply(
       `🎉 <b>Account Connected!</b>\n\nYour Telegram is paired with ResitKu.\n\n📸 Send a receipt photo to start tracking!`,
