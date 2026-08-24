@@ -7,8 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "bot": "tsx src/bot/index.ts",
-    "test": "tsx tests/validateDate.test.ts"
+    "test": "tsx tests/validateDate.test.ts",
+    "test:export": "tsx tests/verifyExportMock.ts",
+    "test:rpc": "tsx tests/verifyRpcClaimedAmount.test.ts",
+    "test:all": "tsx tests/validateDate.test.ts && tsx tests/verifyExportMock.ts && tsx tests/verifyRpcClaimedAmount.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

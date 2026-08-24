@@ -4,6 +4,14 @@ All notable changes and architectural decisions for **ResitKu** are documented h
 
 ---
 
+## 2026-08-24 — Project Structure Clean-up & Unified Test Suite
+- **Orphan File Removal:** Deleted unused legacy files (`src/components/dashboard/BottomNav.tsx`, `scripts/run_date_tests.js`).
+- **Centralized Domain Types (`src/types/index.ts`):** Created barrel export exporting canonical interfaces (`Receipt`, `ReceiptLineItem`, `ReliefRule`, `FilingProfile`, `DateValidationResult`).
+- **Guaranteed Test Cleanup (`tests/verifyRpcClaimedAmount.test.ts`):** Wrapped database mutation test in a `try/finally` block to guarantee test receipts are deleted even if assertions or RPC calls fail.
+- **Unified Test Script (`package.json`):** Added `"test:all"` running all test suites (`validateDate`, `verifyExport`, `verifyRpcClaimedAmount`) sequentially with 100% pass rate.
+
+---
+
 ## 2026-08-24 — Tax Profile Component Modularization
 - **Component Separation (`src/app/dashboard/profile/page.tsx`):** Refactored the 584-line monolithic profile page into two focused, isolated sub-components:
   - `TelegramLinkCard.tsx` ([`src/components/dashboard/TelegramLinkCard.tsx`](file:///c:/Users/ASUS/Desktop/resitku/src/components/dashboard/TelegramLinkCard.tsx)): Manages Telegram pairing, 6-digit code generation, countdown timers, clipboard copying, and disconnect modal.
