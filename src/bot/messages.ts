@@ -180,7 +180,8 @@ export const expensesSummaryMessage = (opts: {
   }
 
   return (
-    `💰 <b>Expenses Overview (${escapeHtml(periodLabel)})</b>\n\n` +
+    `💰 <b>Expenses Overview (${escapeHtml(periodLabel)})</b>\n` +
+    `<i>(filtered by transaction date)</i>\n\n` +
     `💵 <b>Total Spent:</b> ${formatRM(totalSpent)}\n` +
     `🧾 <b>Confirmed Receipts:</b> ${receiptCount}\n\n` +
     `<b>Top Spending Categories:</b>\n` +
