@@ -441,21 +441,12 @@ bot.command('relief', async (ctx) => {
   const currentCalendarYear = new Date().getFullYear()
   const targetYear = currentCalendarYear
 
-  // Fetch active/draft rules for targetYear
-  let { data: rules } = await supabase
+  // Fetch active rules for targetYear
+  const { data: rules } = await supabase
     .from('relief_rules')
     .select('id, assessment_year, rule_version, status, category_key, category_label, category_label_en, category_label_ms, limit_amount, sub_cap_parent_id, enforces_combined_cap')
     .eq('assessment_year', targetYear)
     .eq('status', 'active')
-
-  if (!rules || rules.length === 0) {
-    const { data: draftRules } = await supabase
-      .from('relief_rules')
-      .select('id, assessment_year, rule_version, status, category_key, category_label, category_label_en, category_label_ms, limit_amount, sub_cap_parent_id, enforces_combined_cap')
-      .eq('assessment_year', targetYear)
-      .eq('status', 'draft')
-    rules = draftRules || []
-  }
 
   // Fetch confirmed receipts with embedded line items
   const { data: receipts, error: receiptsErr } = await supabase

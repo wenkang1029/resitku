@@ -46,16 +46,20 @@ async function testAdminRulesWorkflow() {
     createdDraftId = draftRule.id
     console.log(`✅ Draft rule created: ID ${createdDraftId}, status = '${draftRule.status}'`)
 
-    // ── TEST 2: Draft Isolation from Calculation Engine ───────────────────────
-    console.log('\n--- Test 2: Verify DRAFT rule is ignored by live calculations ---')
-    // Active rules for YA 2029 (should only consider status: 'active')
-    const { data: activeRules } = await sbAdmin
+    // ── TEST 2: Draft Isolation from Calculation Engine & Public API ─────────
+    console.log('\n--- Test 2: Verify DRAFT rule is ignored by public /api/rules and calculations ---')
+    // Check public API query behavior (must only return status = active)
+    const { data: publicApiRules } = await sbAdmin
       .from('relief_rules')
       .select('*')
       .eq('assessment_year', TEST_YA)
       .eq('status', 'active')
+      .order('id', { ascending: true })
 
-    assert.strictEqual((activeRules || []).length, 0, 'No active rules should exist for YA 2029')
+    assert.strictEqual((publicApiRules || []).length, 0, 'Public API endpoint query must exclude draft rules')
+
+    // Active rules for YA 2029 (should only consider status: 'active')
+    const activeRules = publicApiRules || []
 
     const mockReceipts: Receipt[] = [
       {

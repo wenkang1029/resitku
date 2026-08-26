@@ -18,11 +18,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // 1. Fetch rules for the target assessment year
+    // 1. Fetch active rules for the target assessment year
     let { data: rules } = await supabase
       .from('relief_rules')
       .select('*')
       .eq('assessment_year', assessmentYear)
+      .eq('status', 'active')
       .order('id', { ascending: true })
 
     // 2. Fetch confirmed receipts with embedded line items for the user

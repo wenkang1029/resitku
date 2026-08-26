@@ -296,8 +296,13 @@ export default function AdminRulesReviewPage() {
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="font-bold text-sm text-[#0F172A]">
-                                {draft.category_label_en}
+                                {draft.category_label_en || draft.category_label || draft.category_key}
                               </span>
+                              {draft.category_label_ms && (
+                                <span className="text-xs text-[#64748B] hidden sm:inline">
+                                  ({draft.category_label_ms})
+                                </span>
+                              )}
                               {isNew ? (
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#DCFCE7] text-[#16A34A] border border-[#BBF7D0]">
                                   + NEW CATEGORY
@@ -309,7 +314,7 @@ export default function AdminRulesReviewPage() {
                               )}
                             </div>
                             <span className="font-mono text-[11px] text-[#64748B]">
-                              {draft.category_key}
+                              Key: <code>{draft.category_key}</code>
                             </span>
                           </div>
 

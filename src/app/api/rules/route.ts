@@ -7,12 +7,13 @@ export async function GET(req: NextRequest) {
     const yearStr = searchParams.get('year')
     const year = yearStr ? Number(yearStr) : 2025
 
-    // Session-aware client with active user cookies — reads public reference rules
+    // Session-aware client with active user cookies — reads public reference rules (active only)
     const supabase = await createServerClient()
     const { data: rules, error } = await supabase
       .from('relief_rules')
       .select('*')
       .eq('assessment_year', year)
+      .eq('status', 'active')
       .order('id', { ascending: true })
 
     if (error) {
