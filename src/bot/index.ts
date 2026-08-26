@@ -714,21 +714,12 @@ bot.callbackQuery(/^(?:y|year):(.+)$/, async (ctx) => {
   const currentYear = receipt.assessment_year || 2025
   const nextYear = currentYear === 2025 ? 2026 : currentYear === 2026 ? 2024 : 2025
 
-  // Fetch corresponding rule_version_id for target nextYear
-  let { data: rules } = await supabase
+  // Fetch corresponding active rule_version_id for target nextYear
+  const { data: rules } = await supabase
     .from('relief_rules')
     .select('id, category_key, rule_version, status')
     .eq('assessment_year', nextYear)
     .eq('status', 'active')
-
-  if (!rules || rules.length === 0) {
-    const { data: draftRules } = await supabase
-      .from('relief_rules')
-      .select('id, category_key, rule_version, status')
-      .eq('assessment_year', nextYear)
-      .eq('status', 'draft')
-    rules = draftRules || []
-  }
 
   const hasRules = rules && rules.length > 0
   let newRuleVersionId: string | null = null

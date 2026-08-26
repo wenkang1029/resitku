@@ -94,21 +94,12 @@ export async function PATCH(
       return NextResponse.json({ error: 'Receipt not found' }, { status: 404 })
     }
 
-    // 2. Fetch corresponding rule_version_id for target assessment_year
-    let { data: rules } = await supabase
+    // 2. Fetch corresponding active rule_version_id for target assessment_year
+    const { data: rules } = await supabase
       .from('relief_rules')
       .select('id, category_key, rule_version, status')
       .eq('assessment_year', targetYear)
       .eq('status', 'active')
-
-    if (!rules || rules.length === 0) {
-      const { data: draftRules } = await supabase
-        .from('relief_rules')
-        .select('id, category_key, rule_version, status')
-        .eq('assessment_year', targetYear)
-        .eq('status', 'draft')
-      rules = draftRules || []
-    }
 
     let newRuleVersionId: string | null = null
     const matchedRule = (rules || []).find((r) => r.category_key === existingReceipt.relief_category)

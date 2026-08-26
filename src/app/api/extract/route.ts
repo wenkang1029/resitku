@@ -81,30 +81,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized: User not authenticated or user_id not provided' }, { status: 401 })
     }
 
-    // 2 & 3. Fetch relief rules for assessment_year (dynamically defaults to current calendar year)
+    // 2 & 3. Fetch active relief rules for assessment_year (dynamically defaults to current calendar year)
     const currentCalendarYear = new Date().getFullYear()
     const targetYear = currentCalendarYear
-    let { data: rules } = await supabase
+    const { data: rules } = await supabase
       .from('relief_rules')
       .select('id, category_key, category_label, limit_amount, description, rule_version, status')
       .eq('assessment_year', targetYear)
       .eq('status', 'active')
 
-    let rulesStatusUsed = 'active'
-
-    if (!rules || rules.length === 0) {
-      const { data: draftRules } = await supabase
-        .from('relief_rules')
-        .select('id, category_key, category_label, limit_amount, description, rule_version, status')
-        .eq('assessment_year', targetYear)
-        .eq('status', 'draft')
-
-      rules = draftRules || []
-      rulesStatusUsed = 'draft'
-    }
+    const activeRules = rules || []
+    const rulesStatusUsed = activeRules.length > 0 ? 'active' : 'none'
 
     // Format rules for prompt injection
-    const rulesContext = rules.map((r) => `- "${r.category_key}": ${r.category_label} (Limit: RM${r.limit_amount ?? 'N/A'})`).join('\n')
+    const rulesContext = activeRules.map((r) => `- "${r.category_key}": ${r.category_label} (Limit: RM${r.limit_amount ?? 'N/A'})`).join('\n')
 
     // 4. Initialize Gemini client and call
     const ai = new GoogleGenAI({ apiKey })
@@ -213,7 +203,7 @@ Guidelines:
     // -------------------------------------------------------------
     // 5. Programmatic Validation & Heuristics
     // -------------------------------------------------------------
-    const validCategoryKeys = new Set(rules.map((r) => r.category_key).concat(['none']))
+    const validCategoryKeys = new Set(activeRules.map((r) => r.category_key).concat(['none']))
     let needsReview = false
     const reviewReasons: string[] = []
 
@@ -236,7 +226,7 @@ Guidelines:
     // Check 3: relief_category validity
     if (!validCategoryKeys.has(extracted.relief_category)) {
       needsReview = true
-      reviewReasons.push(`Relief category '${extracted.relief_category}' is not in active/draft relief rules`)
+      reviewReasons.push(`Relief category '${extracted.relief_category}' is not in active relief rules`)
     }
 
     // Check 4: Deterministic Date Validation & Cross-Check (src/lib/extraction/validateDate.ts)
@@ -270,12 +260,12 @@ Guidelines:
     // Determine rule_version_id
     // -------------------------------------------------------------
     let ruleVersionId: string | null = null
-    const matchedRule = rules.find((r) => r.category_key === extracted.relief_category)
+    const matchedRule = activeRules.find((r) => r.category_key === extracted.relief_category)
     if (matchedRule) {
       ruleVersionId = matchedRule.id
-    } else if (rules.length > 0) {
-      const noneRule = rules.find((r) => r.category_key === 'none')
-      const fallbackRule = noneRule || rules[0]
+    } else if (activeRules.length > 0) {
+      const noneRule = activeRules.find((r) => r.category_key === 'none')
+      const fallbackRule = noneRule || activeRules[0]
       ruleVersionId = fallbackRule ? fallbackRule.id : null
     }
 
