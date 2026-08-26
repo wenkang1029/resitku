@@ -3,16 +3,17 @@
 import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ReceiptText, ShieldCheck, Clock, Settings } from 'lucide-react'
+import { ReceiptText, ShieldCheck, Clock, Settings, Shield } from 'lucide-react'
 
 import { useAssessmentYear } from '@/context/YearContext'
 import { ChevronDown } from 'lucide-react'
 
 interface NavigationProps {
   pendingCount?: number
+  isAdmin?: boolean
 }
 
-export function Navigation({ pendingCount = 0 }: NavigationProps) {
+export function Navigation({ pendingCount = 0, isAdmin = false }: NavigationProps) {
   const pathname = usePathname()
   const { selectedYear, setSelectedYear, availableYears } = useAssessmentYear()
 
@@ -42,6 +43,16 @@ export function Navigation({ pendingCount = 0 }: NavigationProps) {
       icon: Settings,
       active: pathname === '/dashboard/profile',
     },
+    ...(isAdmin
+      ? [
+          {
+            label: 'Admin Rules',
+            href: '/dashboard/admin/rules',
+            icon: Shield,
+            active: pathname?.startsWith('/dashboard/admin'),
+          },
+        ]
+      : []),
   ]
 
   return (

@@ -12,7 +12,8 @@
     "test:export": "tsx tests/verifyExportMock.ts",
     "test:rpc": "tsx tests/verifyRpcClaimedAmount.test.ts",
     "test:bot": "tsx tests/testBotCommands.ts",
-    "test:all": "tsx tests/validateDate.test.ts && tsx tests/verifyExportMock.ts && tsx tests/verifyRpcClaimedAmount.test.ts && tsx tests/testBotCommands.ts"
+    "test:admin": "tsx tests/testAdminRulesWorkflow.test.ts",
+    "test:all": "tsx tests/validateDate.test.ts && tsx tests/verifyExportMock.ts && tsx tests/verifyRpcClaimedAmount.test.ts && tsx tests/testBotCommands.ts && tsx tests/testAdminRulesWorkflow.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

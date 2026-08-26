@@ -9,10 +9,23 @@ interface DashboardLayoutProps {
 
 export default async function DashboardLayout({ children }: DashboardLayoutProps) {
   const supabase = await createServerClient()
-  const { data: pendingData } = await supabase
-    .from('receipts')
-    .select('id')
-    .eq('status', 'pending_review')
+  const [
+    { data: pendingData },
+    { data: { user } },
+  ] = await Promise.all([
+    supabase.from('receipts').select('id').eq('status', 'pending_review'),
+    supabase.auth.getUser(),
+  ])
+
+  let isAdmin = false
+  if (user) {
+    const { data: userData } = await supabase
+      .from('users')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single()
+    isAdmin = Boolean(userData?.is_admin)
+  }
 
   const pendingCount = pendingData?.length || 0
 
@@ -21,7 +34,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
       <div className="min-h-screen bg-[#FAFAFA] text-[#0F172A] flex justify-center">
         <div className="w-full max-w-6xl min-h-screen flex flex-col lg:flex-row pb-20 lg:pb-0">
           {/* Single Shared Navigation for ALL Dashboard Pages */}
-          <Navigation pendingCount={pendingCount} />
+          <Navigation pendingCount={pendingCount} isAdmin={isAdmin} />
 
           {/* Dynamic Page Content */}
           <div className="flex-1 flex flex-col min-w-0">

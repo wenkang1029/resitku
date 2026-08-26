@@ -4,6 +4,16 @@ All notable changes and architectural decisions for **ResitKu** are documented h
 
 ---
 
+## 2026-08-26 — Admin Tax Relief Rules Registry & Draft-Review-Publish Safety Workflow (FR-4.4)
+- **Role-Based Access Control (`is_admin` Column & Guardrails):** Added `is_admin boolean DEFAULT false` column to `users` table (Migration 010). Created server-side verification helper `verifyAdminSession()` strictly protecting `/dashboard/admin/*` UI and all `/api/admin/rules/*` endpoints against unauthenticated or non-admin users.
+- **Rule Hierarchy Tree View (`/dashboard/admin/rules`):** Implemented administrative registry with assessment year selector, status filtering (`all`, `active`, `draft`, `superseded`), and recursive tree rendering ([`src/lib/relief/rulesTree.ts`](file:///c:/Users/ASUS/Desktop/resitku/src/lib/relief/rulesTree.ts)) displaying parent-child relationships, statutory limits, and umbrella cap badges.
+- **Draft Rule Editor ([`src/components/admin/RuleEditorModal.tsx`](file:///c:/Users/ASUS/Desktop/resitku/src/components/admin/RuleEditorModal.tsx)):** Added modal form for proposing new categories or drafting updates to existing rules. Enforces mandatory `source_reference` citations (gazette / budget speech), dynamically scopes sub-cap parent selection within the same assessment year to prevent circular references, and restricts all submissions to `status: 'draft'`.
+- **Draft Review & Diff Publication Workflow (`/dashboard/admin/rules/review`):** Implemented dedicated diff view comparing proposed drafts against active rules with highlighted field changes, source citations, and selective row checkboxes. Features a confirmation modal that promotes selected drafts to `status: 'active'` while safely setting prior versions to `status: 'superseded'`.
+- **Strict Immutability Guarantee:** Active and superseded rules are permanently immutable (`PATCH /api/admin/rules/[id]` rejects edits to non-draft rows), preserving receipt historical attribution baselines and preventing silent tax calculation shifts.
+- **Automated Workflow Test Suite (`tests/testAdminRulesWorkflow.test.ts`):** Added end-to-end integration tests verifying draft isolation from live calculations, active rule immutability rejection, and automatic superseding on publication.
+
+---
+
 ## 2026-08-26 — Telegram Bot In-Chat Expense & Tax Relief Query Commands
 - **In-Chat Spending Summary (`/expenses [today|week|month|year]`):** Added bot command allowing linked users to query their confirmed expense totals, top spending categories (with emojis and percentage share), and receipt counts directly inside Telegram chat. Defaults to current calendar month when no argument is specified.
 - **Canonical Calculation Extraction (`src/lib/relief/calculateExpenses.ts`):** Extracted `calculateExpensesSummary` and `filterReceiptsByPeriod` as shared utilities. Reused across both Web Expenses dashboard (`/dashboard/expenses`) and Telegram bot `/expenses` to guarantee 100% numerical parity and avoid calculation drift.
