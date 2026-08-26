@@ -10,13 +10,19 @@ export default function TaxProfilePage() {
   const [loading, setLoading] = useState(true)
   const [telegramId, setTelegramId] = useState<number | null>(null)
   const [filingProfile, setFilingProfile] = useState<FilingProfile | null>(null)
+  const [rules, setRules] = useState<any[]>([])
 
   useEffect(() => {
-    async function loadProfile() {
+    async function loadProfileAndRules() {
       try {
         setLoading(true)
-        const res = await fetch('/api/profile')
-        const data = await res.json()
+        const [profileRes, rulesRes] = await Promise.all([
+          fetch('/api/profile'),
+          fetch('/api/rules?year=2025')
+        ])
+        
+        const data = await profileRes.json()
+        const rulesData = await rulesRes.json()
 
         if (data.telegram_id !== undefined) {
           setTelegramId(data.telegram_id)
@@ -24,14 +30,17 @@ export default function TaxProfilePage() {
         if (data.filing_profile) {
           setFilingProfile(data.filing_profile)
         }
+        if (rulesData.rules) {
+          setRules(rulesData.rules)
+        }
       } catch (err) {
-        console.error('Failed to load profile:', err)
+        console.error('Failed to load profile or rules:', err)
       } finally {
         setLoading(false)
       }
     }
 
-    loadProfile()
+    loadProfileAndRules()
   }, [])
 
   if (loading) {
@@ -65,7 +74,7 @@ export default function TaxProfilePage() {
         />
 
         {/* 2. Personal Tax Profile & Filing Status Form */}
-        <TaxReliefProfileForm initialProfile={filingProfile} />
+        <TaxReliefProfileForm initialProfile={filingProfile} initialRules={rules} />
       </main>
     </>
   )

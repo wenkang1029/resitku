@@ -4,6 +4,13 @@ All notable changes and architectural decisions for **ResitKu** are documented h
 
 ---
 
+## 2026-08-26 — Data-Sync & Validation Correctness Fixes
+- **Dynamic Tax Relief Form Amounts (`src/components/dashboard/TaxReliefProfileForm.tsx` & `src/app/dashboard/profile/page.tsx`):** Replaced hardcoded static RM caps with dynamic values derived directly from the statutory `relief_rules` record fetched from `/api/rules?year=2025`. Form now automatically reflects updated allowance limits for OKU spouse, personal OKU, and child education/disability tiers without requiring frontend JSX copy changes.
+- **Client-Side File Size Enforcement (`src/components/dashboard/QuickUploadModal.tsx`):** Added strict programmatic validation in `handleFileSelect` rejecting images larger than 15MB before reading them into memory via `FileReader`, matching the modal's stated limit.
+- **Category Key Standardization (`src/lib/relief/applicableCategories.ts`):** Fixed a category key discrepancy where disabled child studying relief was incorrectly mapped to `disabled_child_studying` instead of the canonical database seed key `disabled_child_higher_ed_additional`.
+
+---
+
 ## 2026-08-24 — PWA Webapp Branding & Home Screen Icons
 - **App Icons (`src/app/icon.png` & `src/app/apple-icon.png`):** Generated high-resolution 512x512 browser favicon and 180x180 Apple touch icon from the official ResitKu blue receipt logo.
 - **PWA Web Manifest (`src/app/manifest.ts`):** Implemented typed Next.js App Router manifest configuration with `standalone` display mode, matching palette (`#0052FF` theme color, `#FAFAFA` background), and 192x192 / 512x512 icons for Android / Chrome / iOS Add-to-Home-Screen workflows.

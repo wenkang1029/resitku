@@ -106,7 +106,7 @@ export function getApplicableCategoryKeys(profile: FilingProfile | null | undefi
     }
     if (hasDisabledChild) {
       keys.add('disabled_child')
-      keys.add('disabled_child_studying')
+      keys.add('disabled_child_higher_ed_additional')
     }
   }
 

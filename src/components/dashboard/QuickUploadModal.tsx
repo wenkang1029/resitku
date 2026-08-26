@@ -41,9 +41,22 @@ export function QuickUploadModal() {
     }
   }, [isOpen])
 
+  const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024 // 15MB limit
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0]
     if (!selected) return
+
+    if (selected.size > MAX_FILE_SIZE_BYTES) {
+      setResult({
+        success: false,
+        error: `File size exceeds the 15MB limit (${(selected.size / (1024 * 1024)).toFixed(1)}MB). Please choose a smaller image.`,
+      })
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      return
+    }
 
     setFile(selected)
     setResult(null)

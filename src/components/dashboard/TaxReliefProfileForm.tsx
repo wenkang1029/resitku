@@ -20,12 +20,38 @@ import { toast } from 'sonner'
 
 interface TaxReliefProfileFormProps {
   initialProfile: FilingProfile | null
+  initialRules?: any[]
 }
 
-export function TaxReliefProfileForm({ initialProfile }: TaxReliefProfileFormProps) {
+function formatRM(amount: number | null | undefined, fallback: number): string {
+  const val = amount !== null && amount !== undefined ? Number(amount) : fallback
+  return `RM ${val.toLocaleString('en-MY')}`
+}
+
+export function TaxReliefProfileForm({ initialProfile, initialRules = [] }: TaxReliefProfileFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
+
+  // Map category_key -> limit_amount from fetched rules
+  const ruleLimits = React.useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const r of initialRules) {
+      if (r.category_key && r.limit_amount != null) {
+        map[r.category_key] = Number(r.limit_amount)
+      }
+    }
+    return map
+  }, [initialRules])
+
+  const spouseOkuLimit = ruleLimits['disabled_spouse'] ?? 6000
+  const selfOkuLimit = ruleLimits['disabled_individual'] ?? 7000
+  const childUnder18Limit = ruleLimits['child_below_18'] ?? 2000
+  const childAlevelLimit = ruleLimits['child_18plus_alevel_matriculation'] ?? 2000
+  const childHigherEdLimit = ruleLimits['child_18plus_higher_ed'] ?? 8000
+  const disabledChildLimit = ruleLimits['disabled_child'] ?? 8000
+  const disabledChildHigherEdLimit = ruleLimits['disabled_child_higher_ed_additional'] ?? 8000
+  const disabledChildTotalWithHigherEd = disabledChildLimit + disabledChildHigherEdLimit
 
   // Profile Form States initialized from props
   const [maritalStatus, setMaritalStatus] = useState<'single' | 'married'>(
@@ -177,7 +203,7 @@ export function TaxReliefProfileForm({ initialProfile }: TaxReliefProfileFormPro
                 className="w-4 h-4 rounded text-[#0052FF] focus:ring-[#0052FF]"
               />
               <span className="text-xs text-[#0F172A] font-medium">
-                Spouse has a registered disability (OKU) — RM 6,000
+                Spouse has a registered disability (OKU) — {formatRM(spouseOkuLimit, 6000)}
               </span>
             </label>
           </div>
@@ -200,7 +226,7 @@ export function TaxReliefProfileForm({ initialProfile }: TaxReliefProfileFormPro
                 I have a registered disability (OKU)
               </span>
               <span className="text-[#64748B] text-[11px]">
-                Unlocks additional RM 7,000 disabled individual relief
+                Unlocks additional {formatRM(selfOkuLimit, 7000)} disabled individual relief
               </span>
             </div>
           </label>
@@ -279,12 +305,12 @@ export function TaxReliefProfileForm({ initialProfile }: TaxReliefProfileFormPro
                         }
                         className="w-full bg-white border border-[#CBD5E1] rounded-lg p-2 text-xs font-medium"
                       >
-                        <option value="below_18">Under 18 Years Old (RM 2,000)</option>
+                        <option value="below_18">Under 18 Years Old ({formatRM(childUnder18Limit, 2000)})</option>
                         <option value="a_level_matriculation">
-                          18+ Studying A-Level / Pre-U / Matriculation (RM 2,000)
+                          18+ Studying A-Level / Pre-U / Matriculation ({formatRM(childAlevelLimit, 2000)})
                         </option>
                         <option value="diploma_degree_higher">
-                          18+ Studying Diploma / Degree or higher (RM 8,000)
+                          18+ Studying Diploma / Degree or higher ({formatRM(childHigherEdLimit, 8000)})
                         </option>
                       </select>
                     </div>
@@ -300,7 +326,7 @@ export function TaxReliefProfileForm({ initialProfile }: TaxReliefProfileFormPro
                           className="w-3.5 h-3.5 rounded text-[#0052FF]"
                         />
                         <span className="text-[11px] text-[#0F172A] font-medium">
-                          Child has a registered disability (OKU) — RM 6,000 / RM 14,000
+                          Child has a registered disability (OKU) — {formatRM(disabledChildLimit, 8000)} / {formatRM(disabledChildTotalWithHigherEd, 16000)} (with higher education)
                         </span>
                       </label>
                     </div>
