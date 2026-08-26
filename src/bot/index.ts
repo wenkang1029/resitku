@@ -3,6 +3,35 @@ import * as dotenv from 'dotenv'
 import * as path from 'path'
 import * as fs from 'fs'
 import { createClient } from '@supabase/supabase-js'
+import { calculateReliefProgress, ReliefRule, Receipt as DomainReceipt } from '@/lib/relief/calculateRelief'
+import { calculateExpensesSummary, ExpensePeriod } from '@/lib/relief/calculateExpenses'
+import {
+  escapeHtml,
+  welcomeMessageLinked,
+  welcomeMessageUnlinked,
+  unlinkedAccountMessage,
+  linkMissingCodeMessage,
+  linkInvalidCodeMessage,
+  linkCodeAlreadyUsedMessage,
+  linkCodeExpiredMessage,
+  linkAccountConflictMessage,
+  linkSuccessMessage,
+  noPendingReceiptsMessage,
+  receiptProcessingMessage,
+  receiptDownloadErrorMessage,
+  receiptUnreadableMessage,
+  receiptExtractionErrorMessage,
+  receiptConfirmedToast,
+  receiptConfirmedMessage,
+  webViewPromptMessage,
+  editPromptMessage,
+  maintenanceAutoConfirmDigest,
+  maintenanceReminderDigest,
+  expensesEmptyState,
+  expensesSummaryMessage,
+  reliefEmptyState,
+  reliefSummaryMessage,
+} from './messages'
 
 // Load .env.local if present (for local development convenience)
 const localEnvPath = path.resolve(process.cwd(), '.env.local')
@@ -42,13 +71,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
-
-const escapeHtml = (str: string | null | undefined) =>
-  (str || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
 
 const truncate = (str: string, maxLen = 22) =>
   str.length > maxLen ? str.slice(0, maxLen - 1) + '…' : str
@@ -219,23 +241,9 @@ bot.command('start', async (ctx) => {
   }
 
   if (isLinked) {
-    await ctx.reply(
-      `👋 <b>Welcome back to ResitKu!</b>\n\n` +
-      `Your Telegram account is connected.\n\n` +
-      `📸 <b>Send a receipt photo</b> to start recording expenses.\n` +
-      `📋 Use /pending to review unconfirmed receipts.`,
-      { parse_mode: 'HTML' }
-    )
+    await ctx.reply(welcomeMessageLinked(), { parse_mode: 'HTML' })
   } else {
-    await ctx.reply(
-      `👋 <b>Welcome to ResitKu Bot!</b>\n\n` +
-      `To start scanning receipts, connect your Telegram account:\n\n` +
-      `1️⃣ Log in to your ResitKu dashboard\n` +
-      `2️⃣ Go to <b>Tax Profile &amp; Settings</b>\n` +
-      `3️⃣ Click <b>Generate Link Code</b>\n` +
-      `4️⃣ Send: <code>/link &lt;6-digit-code&gt;</code>`,
-      { parse_mode: 'HTML' }
-    )
+    await ctx.reply(welcomeMessageUnlinked(), { parse_mode: 'HTML' })
   }
 })
 
@@ -246,10 +254,7 @@ bot.command('link', async (ctx) => {
 
   const rawCode = (ctx.match || '').toString().trim()
   if (!rawCode) {
-    await ctx.reply(
-      `⚠️ <b>Missing Link Code</b>\n\nExample: <code>/link 123456</code>`,
-      { parse_mode: 'HTML' }
-    )
+    await ctx.reply(linkMissingCodeMessage(), { parse_mode: 'HTML' })
     return
   }
 
@@ -267,31 +272,28 @@ bot.command('link', async (ctx) => {
       console.warn(
         `[SECURITY AUDIT] Failed /link attempt (code not found): code="${rawCode}", telegramId=${telegramId}, username=${username}, name="${userDisplay}"`
       )
-      await ctx.reply(`❌ <b>Invalid Link Code</b>\n\nCode <code>${rawCode}</code> not found. Generate a new one on your dashboard.`, { parse_mode: 'HTML' })
+      await ctx.reply(linkInvalidCodeMessage(rawCode), { parse_mode: 'HTML' })
       return
     }
     if (codeRecord.used) {
       console.warn(
         `[SECURITY AUDIT] Failed /link attempt (code already used): code="${rawCode}", telegramId=${telegramId}, username=${username}, targetUserId=${codeRecord.user_id}`
       )
-      await ctx.reply(`❌ <b>Code Already Used</b>\n\nGenerate a new code on your dashboard.`, { parse_mode: 'HTML' })
+      await ctx.reply(linkCodeAlreadyUsedMessage(), { parse_mode: 'HTML' })
       return
     }
     if (new Date(codeRecord.expires_at).getTime() < Date.now()) {
       console.warn(
         `[SECURITY AUDIT] Failed /link attempt (code expired): code="${rawCode}", telegramId=${telegramId}, username=${username}, expiredAt=${codeRecord.expires_at}`
       )
-      await ctx.reply(`⏳ <b>Code Expired</b>\n\nGenerate a new code (valid 10 min) on your dashboard.`, { parse_mode: 'HTML' })
+      await ctx.reply(linkCodeExpiredMessage(), { parse_mode: 'HTML' })
       return
     }
     if (existingLinkedUser && existingLinkedUser.id !== codeRecord.user_id) {
       console.warn(
         `[SECURITY AUDIT] Failed /link attempt (account conflict): telegramId=${telegramId}, currentlyLinkedTo=${existingLinkedUser.id}, targetUserId=${codeRecord.user_id}`
       )
-      await ctx.reply(
-        `⚠️ <b>Account Conflict</b>\n\nThis Telegram is already linked to <b>${existingLinkedUser.email || 'another account'}</b>.\nUnlink first from the web dashboard.`,
-        { parse_mode: 'HTML' }
-      )
+      await ctx.reply(linkAccountConflictMessage(existingLinkedUser.email || 'another account'), { parse_mode: 'HTML' })
       return
     }
 
@@ -308,10 +310,7 @@ bot.command('link', async (ctx) => {
       `[SECURITY AUDIT] Successful /link pairing: userId=${codeRecord.user_id}, telegramId=${telegramId}, username=${username}`
     )
 
-    await ctx.reply(
-      `🎉 <b>Account Connected!</b>\n\nYour Telegram is paired with ResitKu.\n\n📸 Send a receipt photo to start tracking!`,
-      { parse_mode: 'HTML' }
-    )
+    await ctx.reply(linkSuccessMessage(), { parse_mode: 'HTML' })
   } catch (err: any) {
     await ctx.reply(`❌ Error: ${err.message || 'Unknown error'}`)
   }
@@ -325,7 +324,7 @@ bot.command('pending', async (ctx) => {
   const { data: userRow } = await supabase
     .from('users').select('id').eq('telegram_id', telegramId).single()
   if (!userRow) {
-    await ctx.reply('🔒 Please link your account first. See /start for instructions.')
+    await ctx.reply(unlinkedAccountMessage(), { parse_mode: 'HTML' })
     return
   }
 
@@ -338,7 +337,7 @@ bot.command('pending', async (ctx) => {
     .limit(1)
 
   if (!pendingReceipts || pendingReceipts.length === 0) {
-    await ctx.reply('✅ <b>No pending receipts!</b>\n\nAll your receipts are confirmed.', { parse_mode: 'HTML' })
+    await ctx.reply(noPendingReceiptsMessage(), { parse_mode: 'HTML' })
     return
   }
 
@@ -370,6 +369,148 @@ bot.command('pending', async (ctx) => {
   }
 })
 
+// /expenses <period> command
+bot.command('expenses', async (ctx) => {
+  const telegramId = ctx.from?.id
+  if (!telegramId) return
+
+  const { data: userRow } = await supabase
+    .from('users').select('id').eq('telegram_id', telegramId).single()
+  if (!userRow) {
+    await ctx.reply(unlinkedAccountMessage(), { parse_mode: 'HTML' })
+    return
+  }
+
+  const rawArg = (ctx.match || '').toString().trim().toLowerCase()
+  let period: ExpensePeriod = 'month'
+  if (['today', 'week', 'month', 'year'].includes(rawArg)) {
+    period = rawArg as ExpensePeriod
+  }
+
+  const periodLabels: Record<ExpensePeriod, string> = {
+    today: 'Today',
+    week: 'This Week',
+    month: 'This Month',
+    year: `This Year (${new Date().getFullYear()})`,
+  }
+
+  // Fetch confirmed receipts for user
+  const { data: receipts, error } = await supabase
+    .from('receipts')
+    .select('id, total_amount, claimed_amount, transaction_date, spending_category, relief_category, status, needs_review, assessment_year')
+    .eq('user_id', userRow.id)
+    .eq('status', 'confirmed')
+    .order('transaction_date', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching expenses for /expenses:', error)
+    await ctx.reply(`❌ Failed to retrieve expenses: ${error.message}`)
+    return
+  }
+
+  const summary = calculateExpensesSummary(receipts || [], period)
+
+  if (summary.receiptCount === 0 || summary.totalSpent === 0) {
+    await ctx.reply(expensesEmptyState(periodLabels[period]), { parse_mode: 'HTML' })
+    return
+  }
+
+  const msg = expensesSummaryMessage({
+    periodLabel: periodLabels[period],
+    totalSpent: summary.totalSpent,
+    receiptCount: summary.receiptCount,
+    categories: summary.categories,
+    webUrl: WEB_URL,
+  })
+
+  await ctx.reply(msg, { parse_mode: 'HTML' })
+})
+
+// /relief command
+bot.command('relief', async (ctx) => {
+  const telegramId = ctx.from?.id
+  if (!telegramId) return
+
+  const { data: userRow } = await supabase
+    .from('users').select('id').eq('telegram_id', telegramId).single()
+  if (!userRow) {
+    await ctx.reply(unlinkedAccountMessage(), { parse_mode: 'HTML' })
+    return
+  }
+
+  const currentCalendarYear = new Date().getFullYear()
+  const targetYear = currentCalendarYear
+
+  // Fetch active/draft rules for targetYear
+  let { data: rules } = await supabase
+    .from('relief_rules')
+    .select('id, assessment_year, rule_version, status, category_key, category_label, category_label_en, category_label_ms, limit_amount, sub_cap_parent_id, enforces_combined_cap')
+    .eq('assessment_year', targetYear)
+    .eq('status', 'active')
+
+  if (!rules || rules.length === 0) {
+    const { data: draftRules } = await supabase
+      .from('relief_rules')
+      .select('id, assessment_year, rule_version, status, category_key, category_label, category_label_en, category_label_ms, limit_amount, sub_cap_parent_id, enforces_combined_cap')
+      .eq('assessment_year', targetYear)
+      .eq('status', 'draft')
+    rules = draftRules || []
+  }
+
+  // Fetch confirmed receipts with embedded line items
+  const { data: receipts, error: receiptsErr } = await supabase
+    .from('receipts')
+    .select('id, merchant, total_amount, claimed_amount, transaction_date, spending_category, relief_category, status, needs_review, assessment_year, receipt_line_items(id, description, amount, spending_category, relief_category, is_claimable, include_in_records)')
+    .eq('user_id', userRow.id)
+    .eq('status', 'confirmed')
+
+  if (receiptsErr) {
+    console.error('Error fetching receipts for /relief:', receiptsErr)
+    await ctx.reply(`❌ Failed to retrieve relief claims: ${receiptsErr.message}`)
+    return
+  }
+
+  const typedRules = (rules || []) as ReliefRule[]
+  const typedReceipts = (receipts || []) as DomainReceipt[]
+
+  const result = calculateReliefProgress(typedRules, typedReceipts, targetYear)
+
+  if (result.total_relief_claimed === 0) {
+    await ctx.reply(reliefEmptyState(targetYear), { parse_mode: 'HTML' })
+    return
+  }
+
+  // Flatten active categories with claims > 0
+  const activeItems: { name: string; claimed: number; limit: number | null; percentage: number }[] = []
+  let totalRootCategories = 0
+
+  for (const cat of result.categories) {
+    totalRootCategories++
+    if (cat.claimed_effective > 0) {
+      const pct = cat.limit_amount ? (cat.claimed_effective / cat.limit_amount) * 100 : 100
+      activeItems.push({
+        name: cat.category_label_en || cat.category_key,
+        claimed: cat.claimed_effective,
+        limit: cat.limit_amount,
+        percentage: pct,
+      })
+    }
+  }
+
+  const unclaimedCount = Math.max(0, totalRootCategories - activeItems.length)
+
+  const msg = reliefSummaryMessage({
+    year: targetYear,
+    totalClaimed: result.total_relief_claimed,
+    totalAvailable: result.total_relief_available,
+    activeCategories: activeItems,
+    unclaimedCategoryCount: unclaimedCount,
+    webUrl: WEB_URL,
+  })
+
+  await ctx.reply(msg, { parse_mode: 'HTML' })
+})
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PHOTO HANDLER
 // ─────────────────────────────────────────────────────────────────────────────
@@ -383,27 +524,18 @@ bot.on('message:photo', async (ctx) => {
     .from('users').select('id').eq('telegram_id', telegramId).single()
 
   if (!userRow) {
-    await ctx.reply(
-      `🔒 <b>Account Not Linked</b>\n\n` +
-      `Connect your Telegram to ResitKu first:\n\n` +
-      `1️⃣ Log in to your ResitKu dashboard\n` +
-      `2️⃣ Open <b>Tax Profile &amp; Settings</b>\n` +
-      `3️⃣ Click <b>Generate Link Code</b>\n` +
-      `4️⃣ Send: <code>/link &lt;6-digit-code&gt;</code>\n\n` +
-      `<i>No receipt was processed.</i>`,
-      { parse_mode: 'HTML' }
-    )
+    await ctx.reply(unlinkedAccountMessage(), { parse_mode: 'HTML' })
     return
   }
 
-  const statusMsg = await ctx.reply('🔍 <i>Processing your receipt...</i>', { parse_mode: 'HTML' })
+  const statusMsg = await ctx.reply(receiptProcessingMessage(), { parse_mode: 'HTML' })
 
   try {
     const photo = ctx.message.photo[ctx.message.photo.length - 1]
     const file = await ctx.api.getFile(photo.file_id)
 
     if (!file.file_path) {
-      await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, '❌ Failed to download photo.')
+      await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, receiptDownloadErrorMessage())
       return
     }
 
@@ -424,7 +556,7 @@ bot.on('message:photo', async (ctx) => {
     if (data.status === 'rejected' || data.reason === 'image_unreadable') {
       await ctx.api.editMessageText(
         ctx.chat.id, statusMsg.message_id,
-        `⚠️ <b>Receipt Unreadable</b>\n\n${escapeHtml(data.details || 'Too blurry or missing details.')}\n\n📸 Please resend a clearer photo.`,
+        receiptUnreadableMessage(data.details),
         { parse_mode: 'HTML' }
       )
       return
@@ -434,13 +566,7 @@ bot.on('message:photo', async (ctx) => {
       await ctx.api.editMessageText(
         ctx.chat.id,
         statusMsg.message_id,
-        `⚠️ <b>Unable to Read Receipt</b>\n\n` +
-        `We had trouble extracting information from this photo.\n\n` +
-        `📸 <i>Tips for best results:</i>\n` +
-        `• Ensure good lighting without shadows or glare\n` +
-        `• Flatten the receipt on a dark background\n` +
-        `• Keep store name, date, and total amount clearly visible\n\n` +
-        `Please try sending a clearer photo!`,
+        receiptExtractionErrorMessage(),
         { parse_mode: 'HTML' }
       )
       return
@@ -698,15 +824,11 @@ bot.callbackQuery(/^(?:c|confirm):(.+)$/, async (ctx) => {
     // Clean up in-memory session
     if (sessionKey) toggleSessions.delete(sessionKey)
 
-    await ctx.answerCallbackQuery({ text: '✅ Receipt confirmed!' })
-
-    const note = excludedCount > 0
-      ? `\n<i>${excludedCount} item(s) excluded — dashboard total adjusted.</i>`
-      : ''
+    await ctx.answerCallbackQuery({ text: receiptConfirmedToast() })
 
     const existingText = ctx.callbackQuery.message?.text || ''
     await ctx.editMessageText(
-      `${existingText}\n\n✅ <b>Confirmed &amp; saved to your dashboard.</b>${note}`,
+      receiptConfirmedMessage(existingText, excludedCount),
       { parse_mode: 'HTML' }
     )
   } catch (err: any) {
@@ -719,24 +841,14 @@ bot.callbackQuery(/^(?:c|confirm):(.+)$/, async (ctx) => {
 bot.callbackQuery(/^(?:w|webview):(.+)$/, async (ctx) => {
   const receiptId = ctx.match[1]
   await ctx.answerCallbackQuery()
-  await ctx.reply(
-    `🌐 <b>Review on Web Dashboard</b>\n\n` +
-    `Open the receipt detail page to toggle individual line items:\n` +
-    `<a href="${WEB_URL}/dashboard/receipts/${receiptId}">View Receipt →</a>`,
-    { parse_mode: 'HTML' }
-  )
+  await ctx.reply(webViewPromptMessage(WEB_URL, receiptId), { parse_mode: 'HTML' })
 })
 
 // Edit button: matches `e:<receiptId>` or legacy `edit:<receiptId>`
 bot.callbackQuery(/^(?:e|edit):(.+)$/, async (ctx) => {
   const receiptId = ctx.match[1]
   await ctx.answerCallbackQuery()
-  await ctx.reply(
-    `✏️ <b>Edit Receipt</b>\n\n` +
-    `Open your dashboard to correct extracted fields:\n` +
-    `<a href="${WEB_URL}/dashboard/receipts/${receiptId}">Edit on Dashboard →</a>`,
-    { parse_mode: 'HTML' }
-  )
+  await ctx.reply(editPromptMessage(WEB_URL, receiptId), { parse_mode: 'HTML' })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -785,10 +897,7 @@ async function runDailyMaintenance() {
         try {
           await bot.api.sendMessage(
             userRow.telegram_id,
-            `🕐 <b>${count} receipt${count > 1 ? 's' : ''} auto-confirmed</b>\n\n` +
-            `These receipts were pending for over 7 days and have been automatically confirmed:\n${list}` +
-            (receipts.length > 5 ? `\n<i>...and ${receipts.length - 5} more</i>` : '') +
-            `\n\nReview anytime on your <a href="${WEB_URL}/dashboard/pending">dashboard →</a>`,
+            maintenanceAutoConfirmDigest(count, list, receipts.length > 5, WEB_URL),
             { parse_mode: 'HTML' }
           )
         } catch (e) {
@@ -831,10 +940,7 @@ async function runDailyMaintenance() {
         try {
           await bot.api.sendMessage(
             userRow.telegram_id,
-            `📋 <b>You have ${count} receipt${count > 1 ? 's' : ''} awaiting confirmation</b> from the past few days:\n\n` +
-            `${list}` +
-            (count > 10 ? `\n<i>...and ${count - 10} more</i>` : '') +
-            `\n\nSend /pending to review and confirm them one by one.`,
+            maintenanceReminderDigest(count, list, count > 10 ? count - 10 : 0),
             { parse_mode: 'HTML' }
           )
         } catch (e) {

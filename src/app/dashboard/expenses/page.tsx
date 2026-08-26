@@ -25,6 +25,7 @@ import {
   CheckCircle2,
   ReceiptText,
 } from 'lucide-react'
+import { calculateExpensesSummary } from '@/lib/relief/calculateExpenses'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -39,7 +40,8 @@ interface ReceiptRow {
   spending_category: string | null
   relief_category: string | null
   needs_review: boolean
-  status: string
+  status: 'pending_review' | 'confirmed'
+  assessment_year: number | null
   possible_duplicate?: boolean
   duplicate_of_id?: string | null
   created_at: string
@@ -106,11 +108,10 @@ export default function ExpensesPage() {
     return selectedYear === 2025
   })
 
-  const totalSpent = yearReceipts.reduce(
-    // COALESCE: use claimed_amount (excluded items removed) when set, else full total
-    (acc, r) => acc + (Number(r.claimed_amount ?? r.total_amount) || 0),
-    0
-  )
+  // Canonical shared calculation
+  const expensesSummary = calculateExpensesSummary(yearReceipts, 'year')
+  const totalSpent = expensesSummary.totalSpent
+  const categoryList = expensesSummary.categories
 
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
   const monthlyData = months.map((m, idx) => {
@@ -125,20 +126,6 @@ export default function ExpensesPage() {
       total: Number(total.toFixed(2)),
     }
   })
-
-  const categoryTotals: Record<string, number> = {}
-  for (const r of yearReceipts) {
-    const cat = r.spending_category || 'other'
-    categoryTotals[cat] = (categoryTotals[cat] || 0) + (Number(r.claimed_amount ?? r.total_amount) || 0)
-  }
-
-  const categoryList = Object.entries(categoryTotals)
-    .map(([cat, amount]) => ({
-      cat,
-      amount,
-      percentage: totalSpent > 0 ? (amount / totalSpent) * 100 : 0,
-    }))
-    .sort((a, b) => b.amount - a.amount)
 
   return (
     <>
@@ -207,15 +194,15 @@ export default function ExpensesPage() {
               <p className="text-xs text-[#64748B] py-6 text-center">No expenses recorded for {selectedYear}.</p>
             ) : (
               <div className="space-y-3.5">
-                {categoryList.map(({ cat, amount, percentage }) => {
-                  const Icon = CATEGORY_ICONS[cat] || Sparkles
-                  const color = CATEGORY_COLORS[cat] || '#64748B'
+                {categoryList.map(({ category, amount, percentage }) => {
+                  const Icon = CATEGORY_ICONS[category] || Sparkles
+                  const color = CATEGORY_COLORS[category] || '#64748B'
                   return (
-                    <div key={cat} className="space-y-1.5">
+                    <div key={category} className="space-y-1.5">
                       <div className="flex justify-between items-center text-xs">
                         <span className="flex items-center gap-2 font-medium text-[#0F172A] capitalize">
                           <Icon className="w-3.5 h-3.5" style={{ color }} />
-                          {cat}
+                          {category}
                         </span>
                         <span className="font-semibold text-[#0F172A] tabular-nums">
                           {formatRM(amount)}{' '}

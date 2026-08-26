@@ -4,6 +4,15 @@ All notable changes and architectural decisions for **ResitKu** are documented h
 
 ---
 
+## 2026-08-26 — Telegram Bot In-Chat Expense & Tax Relief Query Commands
+- **In-Chat Spending Summary (`/expenses [today|week|month|year]`):** Added bot command allowing linked users to query their confirmed expense totals, top spending categories (with emojis and percentage share), and receipt counts directly inside Telegram chat. Defaults to current calendar month when no argument is specified.
+- **Canonical Calculation Extraction (`src/lib/relief/calculateExpenses.ts`):** Extracted `calculateExpensesSummary` and `filterReceiptsByPeriod` as shared utilities. Reused across both Web Expenses dashboard (`/dashboard/expenses`) and Telegram bot `/expenses` to guarantee 100% numerical parity and avoid calculation drift.
+- **In-Chat Tax Relief Progress (`/relief`):** Added bot command displaying the user's total active tax relief claims against statutory limits for the current Assessment Year. Implemented progressive disclosure to avoid "wall of zeros" by displaying only categories with active claims along with an unclaimed category count summary. Reuses canonical `calculateReliefProgress` calculation engine.
+- **Centralized Bot Message Templates (`src/bot/messages.ts`):** Created dedicated messages module isolating all user-facing bot strings, templates, formatters, and empty state cards. Refactored `src/bot/index.ts` to consume these templates, establishing a clean foundation for future bilingual (EN/BM) localization.
+- **Updated Bot Discovery:** Updated `/start` welcome cards and account link success messages to guide users on using `/expenses` and `/relief`.
+
+---
+
 ## 2026-08-26 — Data-Sync & Validation Correctness Fixes
 - **Dynamic Tax Relief Form Amounts (`src/components/dashboard/TaxReliefProfileForm.tsx` & `src/app/dashboard/profile/page.tsx`):** Replaced hardcoded static RM caps with dynamic values derived directly from the statutory `relief_rules` record fetched from `/api/rules?year=2025`. Form now automatically reflects updated allowance limits for OKU spouse, personal OKU, and child education/disability tiers without requiring frontend JSX copy changes.
 - **Client-Side File Size Enforcement (`src/components/dashboard/QuickUploadModal.tsx`):** Added strict programmatic validation in `handleFileSelect` rejecting images larger than 15MB before reading them into memory via `FileReader`, matching the modal's stated limit.
