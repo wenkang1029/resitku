@@ -461,13 +461,14 @@ bot.command('relief', async (ctx) => {
     return
   }
 
+  const hasRules = (rules || []).length > 0
   const typedRules = (rules || []) as ReliefRule[]
   const typedReceipts = (receipts || []) as DomainReceipt[]
 
   const result = calculateReliefProgress(typedRules, typedReceipts, targetYear)
 
   if (result.total_relief_claimed === 0) {
-    await ctx.reply(reliefEmptyState(targetYear), { parse_mode: 'HTML' })
+    await ctx.reply(reliefEmptyState(targetYear, hasRules), { parse_mode: 'HTML' })
     return
   }
 

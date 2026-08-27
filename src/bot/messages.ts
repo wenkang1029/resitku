@@ -192,10 +192,21 @@ export const expensesSummaryMessage = (opts: {
 
 // ── TAX RELIEF COMMAND MESSAGES ────────────────────────────────────────────
 
-export const reliefEmptyState = (year: number): string =>
-  `🏛️ <b>Tax Relief Progress — YA ${year}</b>\n\n` +
-  `No relief claims recorded yet for YA ${year}.\n\n` +
-  `📸 Send receipt photos eligible for tax deductions to start building your claims!`
+export const reliefEmptyState = (year: number, hasRules = true): string => {
+  if (!hasRules) {
+    return (
+      `🏛️ <b>Tax Relief Progress — YA ${year}</b>\n\n` +
+      `⚠️ <b>Official tax relief rules for YA ${year} have not been published yet.</b>\n\n` +
+      `Your receipts for ${year} are safely recorded as expenses. Once official LHDN rules for YA ${year} are gazetted and activated, your tax relief claims will be calculated automatically!`
+    )
+  }
+
+  return (
+    `🏛️ <b>Tax Relief Progress — YA ${year}</b>\n\n` +
+    `No relief claims recorded yet for YA ${year}.\n\n` +
+    `📸 Send receipt photos eligible for tax deductions to start building your claims!`
+  )
+}
 
 export interface ReliefActiveCategoryItem {
   name: string
