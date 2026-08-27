@@ -165,7 +165,7 @@ export function RuleEditorModal({
             <div className="p-3 bg-[#EFF6FF] border border-[#BFDBFE] rounded-xl flex items-start gap-2.5 text-[#1E40AF]">
               <Info className="w-4 h-4 text-[#3B82F6] shrink-0 mt-0.5" />
               <p className="text-[11px] leading-relaxed">
-                <b>Draft Guardrail:</b> All changes save as <code>status: draft</code>. They will not affect live dashboard calculations or receipt extraction until explicitly reviewed and published on the review page.
+                <b>Draft Protection:</b> All changes are saved as unpublished drafts. They will not affect your live tax calculations or receipt scanning until you review and publish them on the review page.
               </p>
             </div>
 

@@ -213,9 +213,9 @@ export default function AdminRulesReviewPage() {
       <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-2xl p-4 flex items-start gap-3">
         <ShieldCheck className="w-5 h-5 text-[#0052FF] shrink-0 mt-0.5" />
         <div className="text-xs text-[#1E3A8A] leading-relaxed">
-          <p className="font-bold mb-0.5">Immutability &amp; Versioning Guarantee (FR-4.4)</p>
+          <p className="font-bold mb-0.5">Historical Record Protection</p>
           <p>
-            Publishing promotes selected drafts to <code>status: active</code>. Any existing active row with matching category key + assessment year is marked <code>status: superseded</code>. Existing receipts with historical <code>rule_version_id</code> remain intact and immutable.
+            Publishing activates the selected changes for this tax year. Any previous versions will be archived safely. Past receipts and calculations remain locked to the official rules in effect when they were recorded.
           </p>
         </div>
       </div>
@@ -381,7 +381,7 @@ export default function AdminRulesReviewPage() {
       <ConfirmDialog
         isOpen={confirmOpen}
         title={`Publish ${selectedDraftIds.length} Tax Relief Rules for YA ${selectedYear}?`}
-        description={`This will activate the selected draft rules immediately. Any previously active versions will be marked as superseded. All existing receipts referencing prior rule versions will preserve their historical calculation baseline.`}
+        description={`This will activate the selected relief rules immediately on your dashboard and calculation engine. Any previous versions will be archived safely, keeping all existing tax filings and receipts consistent.`}
         confirmLabel="Yes, Publish to Active"
         cancelLabel="Keep in Draft"
         isDestructive={false}
